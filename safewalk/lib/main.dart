@@ -1,327 +1,543 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'auth_screens.dart';
 
 void main() {
-  runApp(const MyApp());
+  runApp(const IMCApp());
 }
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+class IMCApp extends StatelessWidget {
+  const IMCApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Calculadora de IMC',
-      theme: ThemeData(
-        useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF8B5CF6), // Lilás moderno
-          brightness: Brightness.light,
-          primary: const Color(0xFF8B5CF6),
-          secondary: const Color(0xFFEC4899),
-        ),
-        scaffoldBackgroundColor: const Color(0xFFF8FAFC), // Fundo neutro claro
-        cardTheme: CardThemeData(
-          elevation: 8,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        ),
-      ),
-      home: const ImcCalculatorScreen(),
+      title: 'Calculadora IMC',
       debugShowCheckedModeBanner: false,
+      theme: ThemeData(
+        scaffoldBackgroundColor: const Color(0xFF1A1A2E),
+        fontFamily: 'Roboto',
+      ),
+      home: const IMCHomePage(),
     );
   }
 }
 
-class ImcCalculatorScreen extends StatefulWidget {
-  const ImcCalculatorScreen({super.key});
+class IMCHomePage extends StatefulWidget {
+  const IMCHomePage({super.key});
 
   @override
-  State<ImcCalculatorScreen> createState() => _ImcCalculatorScreenState();
+  State<IMCHomePage> createState() => _IMCHomePageState();
 }
 
-class _ImcCalculatorScreenState extends State<ImcCalculatorScreen>
+class _IMCHomePageState extends State<IMCHomePage>
     with SingleTickerProviderStateMixin {
-  double _heightCm = 170.0;
-  double _weightKg = 70.0;
-  double? _imc;
-  String? _classification;
-  Color? _resultColor;
-  bool _showResult = false;
-  late AnimationController _controller;
-  late Animation<double> _animation;
+  bool isAdulto = true;
+  final TextEditingController _alturaController =
+      TextEditingController(text: '170');
+  final TextEditingController _pesoController =
+      TextEditingController(text: '80.5');
 
-  // Cores dinâmicas para classificação
-  static const Map<String, Color> _classificationColors = {
-    'Abaixo do peso': Color(0xFF06B6D4), // Ciano
-    'Peso normal': Color(0xFF10B981), // Verde
-    'Sobrepeso': Color(0xFFF59E0B), // Laranja
-    'Obesidade': Color(0xFFEF4444), // Vermelho
-  };
+  double? imc;
+  String resultado = '';
+  Color resultadoColor = const Color(0xFFFFD600);
+  late AnimationController _animController;
+  late Animation<double> _needleAnimation;
+  double _needleTarget = 0.0;
 
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(
-      duration: const Duration(milliseconds: 800),
+    _animController = AnimationController(
       vsync: this,
+      duration: const Duration(milliseconds: 700),
     );
-    _animation = Tween<double>(begin: 0, end: 1).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeOutBack),
+    _needleAnimation =
+        Tween<double>(begin: 0.0, end: 0.0).animate(
+      CurvedAnimation(parent: _animController, curve: Curves.easeInOut),
     );
   }
 
   @override
   void dispose() {
-    _controller.dispose();
+    _alturaController.dispose();
+    _pesoController.dispose();
+    _animController.dispose();
     super.dispose();
   }
 
-  String _getClassification(double imc) {
-    if (imc < 18.5) return 'Abaixo do peso';
-    if (imc < 25.0) return 'Peso normal';
-    if (imc < 30.0) return 'Sobrepeso';
-    return 'Obesidade';
-  }
+  void _calcular() {
+    final double? altura = double.tryParse(
+        _alturaController.text.replaceAll(',', '.'));
+    final double? peso =
+        double.tryParse(_pesoController.text.replaceAll(',', '.'));
 
-  Color _getColor(String classification) => _classificationColors[classification] ?? Colors.grey;
-
-  void _calculateImc() {
-    if (_heightCm <= 0 || _weightKg <= 0) {
+    if (altura == null || peso == null || altura <= 0 || peso <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Por favor, insira valores válidos')),
+        const SnackBar(content: Text('Por favor, insira valores válidos.')),
       );
       return;
     }
 
-    setState(() {
-      _imc = _weightKg / ((_heightCm / 100) * (_heightCm / 100));
-      _classification = _getClassification(_imc!);
-      _resultColor = _getColor(_classification!);
-      _showResult = true;
-    });
+    final double alturaM = altura / 100;
+    final double imcCalc = peso / (alturaM * alturaM);
 
-    _controller.forward().then((_) => _controller.reverse());
-    HapticFeedback.mediumImpact(); // Feedback háptico
+    String res;
+    Color cor;
+    double needle;
+
+    if (isAdulto) {
+      if (imcCalc < 18.5) {
+        res = 'Abaixo do peso';
+        cor = const Color(0xFF5B9CF6);
+        needle = _mapIMC(imcCalc, 10, 18.5, 0.0, 0.20);
+      } else if (imcCalc < 25) {
+        res = 'Peso normal';
+        cor = const Color(0xFF4CAF50);
+        needle = _mapIMC(imcCalc, 18.5, 25, 0.20, 0.42);
+      } else if (imcCalc < 30) {
+        res = 'Sobrepeso';
+        cor = const Color(0xFFFFD600);
+        needle = _mapIMC(imcCalc, 25, 30, 0.42, 0.62);
+      } else if (imcCalc < 35) {
+        res = 'Obesidade grau I';
+        cor = const Color(0xFFFF9800);
+        needle = _mapIMC(imcCalc, 30, 35, 0.62, 0.80);
+      } else {
+        res = 'Obesidade grau II+';
+        cor = const Color(0xFFF44336);
+        needle = _mapIMC(imcCalc, 35, 50, 0.80, 1.0);
+      }
+    } else {
+      // Idoso: critérios ligeiramente diferentes
+      if (imcCalc < 22) {
+        res = 'Abaixo do peso';
+        cor = const Color(0xFF5B9CF6);
+        needle = _mapIMC(imcCalc, 10, 22, 0.0, 0.25);
+      } else if (imcCalc < 27) {
+        res = 'Peso normal';
+        cor = const Color(0xFF4CAF50);
+        needle = _mapIMC(imcCalc, 22, 27, 0.25, 0.50);
+      } else if (imcCalc < 30) {
+        res = 'Sobrepeso';
+        cor = const Color(0xFFFFD600);
+        needle = _mapIMC(imcCalc, 27, 30, 0.50, 0.68);
+      } else if (imcCalc < 35) {
+        res = 'Obesidade grau I';
+        cor = const Color(0xFFFF9800);
+        needle = _mapIMC(imcCalc, 30, 35, 0.68, 0.85);
+      } else {
+        res = 'Obesidade grau II+';
+        cor = const Color(0xFFF44336);
+        needle = _mapIMC(imcCalc, 35, 50, 0.85, 1.0);
+      }
+    }
+
+    _needleTarget = needle.clamp(0.0, 1.0);
+    _needleAnimation = Tween<double>(
+      begin: _needleAnimation.value,
+      end: _needleTarget,
+    ).animate(
+      CurvedAnimation(parent: _animController, curve: Curves.easeInOut),
+    );
+    _animController.forward(from: 0);
+
+    setState(() {
+      imc = imcCalc;
+      resultado = res;
+      resultadoColor = cor;
+    });
   }
 
-  void _reset() {
-    setState(() {
-      _heightCm = 170.0;
-      _weightKg = 70.0;
-      _imc = null;
-      _classification = null;
-      _resultColor = null;
-      _showResult = false;
-    });
-    _controller.reset();
-    HapticFeedback.lightImpact();
+  double _mapIMC(
+      double value, double inMin, double inMax, double outMin, double outMax) {
+    return outMin + (value - inMin) / (inMax - inMin) * (outMax - outMin);
   }
 
   @override
   Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final screenHeight = MediaQuery.of(context).size.height;
+    final size = MediaQuery.of(context).size;
 
     return Scaffold(
-      body: SingleChildScrollView(
-        padding: EdgeInsets.symmetric(
-          horizontal: screenWidth * 0.08,
-          vertical: screenHeight * 0.1,
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            // Título
-            Text(
-              'Calculadora de IMC',
-              style: Theme.of(context).textTheme.headlineLarge?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: const Color(0xFF1E293B),
-              ),
-              textAlign: TextAlign.center,
-            ),
-            SizedBox(height: screenHeight * 0.08),
-
-            // Card Altura
-            _buildInputCard(
-              icon: Icons.height,
-              title: 'Altura',
-              value: _heightCm,
-              min: 100,
-              max: 220,
-              unit: 'cm',
-              onChanged: (value) => setState(() => _heightCm = value),
-            ),
-            SizedBox(height: screenHeight * 0.04),
-
-            // Card Peso
-            _buildInputCard(
-              icon: Icons.fitness_center,
-              title: 'Peso',
-              value: _weightKg,
-              min: 30,
-              max: 200,
-              unit: 'kg',
-              onChanged: (value) => setState(() => _weightKg = value),
-            ),
-            SizedBox(height: screenHeight * 0.06),
-
-            // Botão Calcular
-            SizedBox(
-              width: double.infinity,
-              height: 60,
-              child: ElevatedButton(
-                onPressed: _calculateImc,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF8B5CF6),
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                  elevation: 10,
+      body: SafeArea(
+        child: SizedBox(
+          height: size.height,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                // Título
+                const Text(
+                  'Calculadora IMC',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
-                child: const Text(
-                  'CALCULAR IMC',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                const SizedBox(height: 4),
+                const Text(
+                  'O IMC (Índice de Massa Corporal) é um cálculo que\nserve para avaliar se a pessoa está dentro do seu peso ideal.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Color(0xFFAAAAAA),
+                    fontSize: 12,
+                  ),
                 ),
-              ),
-            ),
-            SizedBox(height: screenHeight * 0.06),
+                const SizedBox(height: 12),
 
-            // Resultado Animado
-            AnimatedBuilder(
-              animation: _animation,
-              builder: (context, child) {
-                if (!_showResult) return const SizedBox.shrink();
-                return Transform.scale(
-                  scale: _animation.value,
-                  child: _buildResultCard(),
-                );
-              },
+                // Toggle Adulto / Idoso
+                Container(
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF16213E),
+                    borderRadius: BorderRadius.circular(30),
+                  ),
+                  padding: const EdgeInsets.all(4),
+                  child: Row(
+                    children: [
+                      _buildToggleButton('Adulto', isAdulto, () {
+                        setState(() => isAdulto = true);
+                      }),
+                      _buildToggleButton('Idoso', !isAdulto, () {
+                        setState(() => isAdulto = false);
+                      }),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+
+                // Campo Altura
+                _buildInputField('Altura', _alturaController, 'cm'),
+                const SizedBox(height: 10),
+
+                // Campo Peso
+                _buildInputField('Peso', _pesoController, 'kg'),
+                const SizedBox(height: 12),
+
+                // Botão calcular
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: GestureDetector(
+                    onTap: _calcular,
+                    child: Container(
+                      width: 52,
+                      height: 52,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFD600),
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: const Icon(Icons.check,
+                          color: Colors.black, size: 28),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+
+                // Resultado texto
+                if (imc != null) ...[
+                  Text(
+                    'IMC: ${imc!.toStringAsFixed(1)}  •  $resultado',
+                    style: TextStyle(
+                      color: resultadoColor,
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ] else ...[
+                  const Text(
+                    'Preencha os campos e pressione ✓',
+                    style: TextStyle(color: Color(0xFF888888), fontSize: 13),
+                  ),
+                ],
+                const SizedBox(height: 4),
+
+                // Gráfico de medidor (gauge)
+                Expanded(
+                  child: AnimatedBuilder(
+                    animation: _needleAnimation,
+                    builder: (context, _) {
+                      return CustomPaint(
+                        painter: GaugePainter(
+                          progress: _needleAnimation.value,
+                          isAdulto: isAdulto,
+                        ),
+                        child: Container(),
+                      );
+                    },
+                  ),
+                ),
+
+                // Legenda
+                _buildLegend(),
+                const SizedBox(height: 10),
+
+                // Botão discreto de interrogação (canto direito)
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: GestureDetector(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const WelcomeScreen()),
+                      );
+                    },
+                    child: Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF2A2A3E),
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: const Color(0xFF3A3A52),
+                          width: 1,
+                        ),
+                      ),
+                      child: const Icon(
+                        Icons.question_mark_rounded,
+                        color: Color(0xFF666688),
+                        size: 18,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 6),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildInputCard({
-    required IconData icon,
-    required String title,
-    required double value,
-    required double min,
-    required double max,
-    required String unit,
-    required Function(double) onChanged,
-  }) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [Colors.white, Colors.white.withOpacity(0.9)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 20,
-            offset: const Offset(0, 10),
+  Widget _buildToggleButton(String label, bool active, VoidCallback onTap) {
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 250),
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          decoration: BoxDecoration(
+            color: active ? const Color(0xFFFFD600) : Colors.transparent,
+            borderRadius: BorderRadius.circular(26),
           ),
-        ],
-      ),
-      child: Column(
-        children: [
-          Icon(icon, size: 40, color: const Color(0xFF8B5CF6)),
-          const SizedBox(height: 12),
-          Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
-          const SizedBox(height: 20),
-          Row(
-            children: [
-              Expanded(child: Slider(
-                value: value,
-                min: min,
-                max: max,
-                divisions: ((max - min) / 5).round(),
-                activeColor: const Color(0xFF8B5CF6),
-                inactiveColor: Colors.grey.shade300,
-                onChanged: onChanged,
-              )),
-              Text('${value.toStringAsFixed(0)} $unit', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildResultCard() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(30),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [_resultColor!.withOpacity(0.1), _resultColor!.withOpacity(0.05)],
-        ),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: _resultColor!.withOpacity(0.3), width: 2),
-        boxShadow: [
-          BoxShadow(
-            color: _resultColor!.withOpacity(0.3),
-            blurRadius: 30,
-            offset: const Offset(0, 15),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          Icon(Icons.analytics, size: 60, color: _resultColor),
-          const SizedBox(height: 20),
-          TweenAnimationBuilder<double>(
-            tween: Tween(begin: 0, end: _imc ?? 0),
-            duration: const Duration(milliseconds: 1200),
-            builder: (context, value, child) {
-              return Text(
-                value.toStringAsFixed(1),
-                style: TextStyle(
-                  fontSize: 64,
-                  fontWeight: FontWeight.bold,
-                  color: const Color(0xFF1E293B),
-                  shadows: [
-                    Shadow(color: _resultColor!.withOpacity(0.5), blurRadius: 10, offset: const Offset(0, 5)),
-                  ],
-                ),
-              );
-            },
-          ),
-          const SizedBox(height: 10),
-          Text(
-            'IMC',
-            style: TextStyle(fontSize: 20, color: Colors.grey[600]),
-          ),
-          const SizedBox(height: 20),
-          Text(
-            _classification ?? '',
+          alignment: Alignment.center,
+          child: Text(
+            label,
             style: TextStyle(
-              fontSize: 28,
+              color: active ? Colors.black : Colors.white,
               fontWeight: FontWeight.bold,
-              color: _resultColor,
+              fontSize: 15,
             ),
-            textAlign: TextAlign.center,
           ),
-          const SizedBox(height: 20),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInputField(
+      String label, TextEditingController controller, String unit) {
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFF16213E),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFFFD600), width: 1.5),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      child: Row(
+        children: [
+          Text(label,
+              style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 15)),
+          const Spacer(),
           SizedBox(
-            width: double.infinity,
-            child: TextButton.icon(
-              onPressed: _reset,
-              icon: const Icon(Icons.refresh, color: Colors.grey),
-              label: const Text('REINICIAR', style: TextStyle(color: Colors.grey)),
-              style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 12)),
+            width: 80,
+            child: TextField(
+              controller: controller,
+              keyboardType:
+                  const TextInputType.numberWithOptions(decimal: true),
+              inputFormatters: [
+                FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]'))
+              ],
+              textAlign: TextAlign.right,
+              style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w500),
+              decoration: const InputDecoration(
+                border: InputBorder.none,
+                isDense: true,
+              ),
             ),
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildLegend() {
+    final items = isAdulto
+        ? [
+            ('< 18.5', const Color(0xFF5B9CF6), 'Abaixo'),
+            ('18.5–24.9', const Color(0xFF4CAF50), 'Normal'),
+            ('25–29.9', const Color(0xFFFFD600), 'Sobrepeso'),
+            ('30–34.9', const Color(0xFFFF9800), 'Ob. I'),
+            ('≥ 35', const Color(0xFFF44336), 'Ob. II+'),
+          ]
+        : [
+            ('< 22', const Color(0xFF5B9CF6), 'Abaixo'),
+            ('22–26.9', const Color(0xFF4CAF50), 'Normal'),
+            ('27–29.9', const Color(0xFFFFD600), 'Sobrepeso'),
+            ('30–34.9', const Color(0xFFFF9800), 'Ob. I'),
+            ('≥ 35', const Color(0xFFF44336), 'Ob. II+'),
+          ];
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+      children: items
+          .map((item) => Column(
+                children: [
+                  Container(
+                    width: 12,
+                    height: 12,
+                    decoration: BoxDecoration(
+                      color: item.$2,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(item.$3,
+                      style: const TextStyle(
+                          color: Colors.white70, fontSize: 9)),
+                  Text(item.$1,
+                      style: const TextStyle(
+                          color: Colors.white38, fontSize: 8)),
+                ],
+              ))
+          .toList(),
     );
   }
 }
 
+class GaugePainter extends CustomPainter {
+  final double progress; // 0.0 a 1.0
+  final bool isAdulto;
+
+  GaugePainter({required this.progress, required this.isAdulto});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final cx = size.width / 2;
+    final cy = size.height * 0.78;
+    final radius = min(size.width * 0.42, size.height * 0.68);
+    final strokeW = radius * 0.22;
+
+    final rect = Rect.fromCircle(center: Offset(cx, cy), radius: radius);
+    const startAngle = pi;
+    const sweepAngle = pi;
+
+    // Segmentos de cor
+    final segments = [
+      (const Color(0xFF5B9CF6), 0.20),
+      (const Color(0xFF4CAF50), 0.22),
+      (const Color(0xFFFFD600), 0.20),
+      (const Color(0xFFFF9800), 0.18),
+      (const Color(0xFFF44336), 0.20),
+    ];
+
+    double currentAngle = startAngle;
+    for (final seg in segments) {
+      final sweep = sweepAngle * seg.$2;
+      final paint = Paint()
+        ..color = seg.$1
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = strokeW
+        ..strokeCap = StrokeCap.butt;
+      canvas.drawArc(rect, currentAngle, sweep, false, paint);
+      currentAngle += sweep;
+    }
+
+    // Gaps entre segmentos
+    final gapPaint = Paint()
+      ..color = const Color(0xFF1A1A2E)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeW + 2
+      ..strokeCap = StrokeCap.butt;
+
+    double gapAngle = startAngle;
+    for (int i = 0; i < segments.length - 1; i++) {
+      gapAngle += sweepAngle * segments[i].$2;
+      canvas.drawArc(
+          rect, gapAngle - 0.012, 0.024, false, gapPaint);
+    }
+
+    // Trilho de fundo (arco externo fino)
+    final trackPaint = Paint()
+      ..color = const Color(0xFF2A2A4A)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2;
+    canvas.drawArc(
+        Rect.fromCircle(
+            center: Offset(cx, cy), radius: radius + strokeW / 2 + 3),
+        startAngle,
+        sweepAngle,
+        false,
+        trackPaint);
+    canvas.drawArc(
+        Rect.fromCircle(
+            center: Offset(cx, cy), radius: radius - strokeW / 2 - 3),
+        startAngle,
+        sweepAngle,
+        false,
+        trackPaint);
+
+    // Agulha
+    final needleAngle = startAngle + sweepAngle * progress;
+    final needleLen = radius + strokeW / 2 + 6;
+    final needleBase = radius - strokeW / 2 - 6;
+    final nx = cx + cos(needleAngle) * needleLen;
+    final ny = cy + sin(needleAngle) * needleLen;
+    final nbx = cx + cos(needleAngle) * needleBase;
+    final nby = cy + sin(needleAngle) * needleBase;
+
+    final needlePaint = Paint()
+      ..color = Colors.white
+      ..strokeWidth = 3
+      ..strokeCap = StrokeCap.round;
+    canvas.drawLine(Offset(nbx, nby), Offset(nx, ny), needlePaint);
+
+    // Centro da agulha
+    final centerPaint = Paint()..color = Colors.white;
+    canvas.drawCircle(Offset(cx, cy), 7, centerPaint);
+    canvas.drawCircle(Offset(cx, cy), 4,
+        Paint()..color = const Color(0xFF1A1A2E));
+
+    // Rótulos mínimo e máximo
+    final labelStyle = const TextStyle(
+      color: Colors.white54,
+      fontSize: 11,
+      fontWeight: FontWeight.bold,
+    );
+
+    _drawText(canvas, isAdulto ? '10' : '10',
+        Offset(cx - radius - strokeW / 2 - 4, cy + 8), labelStyle);
+    _drawText(canvas, '50+',
+        Offset(cx + radius + strokeW / 2 - 12, cy + 8), labelStyle);
+  }
+
+  void _drawText(
+      Canvas canvas, String text, Offset position, TextStyle style) {
+    final tp = TextPainter(
+      text: TextSpan(text: text, style: style),
+      textDirection: TextDirection.ltr,
+    )..layout();
+    tp.paint(canvas, position);
+  }
+
+  @override
+  bool shouldRepaint(GaugePainter oldDelegate) =>
+      oldDelegate.progress != progress || oldDelegate.isAdulto != isAdulto;
+}
