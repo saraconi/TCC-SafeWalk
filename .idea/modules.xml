@@ -3,7 +3,6 @@
   <component name="ProjectModuleManager">
     <modules>
       <module fileurl="file://$PROJECT_DIR$/.idea/TCC-SafeWalk.iml" filepath="$PROJECT_DIR$/.idea/TCC-SafeWalk.iml" />
-      <module fileurl="file://$PROJECT_DIR$/safewalk/safewalk.iml" filepath="$PROJECT_DIR$/safewalk/safewalk.iml" />
     </modules>
   </component>
 </project>
