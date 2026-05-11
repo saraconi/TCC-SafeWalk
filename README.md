@@ -32,9 +32,9 @@ O SafeWalk transforma o celular em um **dispositivo de segurança ativa**: ao de
 
 | Nome | GitHub |
 |---|---|
-| João Guilherme | [@usuario](https://github.com) |
+| João Guilherme | [@joaopresser](https://github.com/joaopresser) |
 | Sara Coni | [@saraconi](https://github.com/saraconi) |
-| Thiago Ochoa | [@usuario](https://github.com) |
+| Thiago Ochoa | [@yungtl](https://github.com/yungtl) |
 
 ---
 
