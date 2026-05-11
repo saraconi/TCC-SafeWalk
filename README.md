@@ -63,22 +63,22 @@ O SafeWalk transforma o celular em um **dispositivo de segurança ativa**: ao de
 O projeto possui duas identidades visuais distintas e intencionais:
 
 ### 🧮 Calculadora IMC — App Disfarce
-
+ 
 | Cor | Hex | Motivo |
 |---|---|---|
-| Preto | `#000000` | Remete a apps de produtividade comuns |
-| Amarelo Vibrante | `#FDC700` | Remete a apps de saúde/fitness |
-
+| ![#000000](https://placehold.co/18x18/000000/000000.png) Preto | `#000000` | Remete a apps de produtividade comuns |
+| ![#FDC700](https://placehold.co/18x18/FDC700/FDC700.png) Amarelo Vibrante | `#FDC700` | Remete a apps de saúde/fitness |
+ 
 > O preto e o amarelo são cores clássicas em apps de saúde. A combinação faz o ícone "sumir" entre outros aplicativos comuns no celular, não levantando suspeitas.
-
+ 
 ### 🛡️ SafeWalk — App Principal
-
+ 
 | Cor | Hex | Motivo |
 |---|---|---|
-| Bordô Profundo | `#8C0368` | Autoridade, confiança e proteção |
-| Magenta Escuro | `#BF04A0` | Empatia, acolhimento e identificação com o público-alvo |
-| Branco | `#FFFFFF` | Legibilidade, clareza e harmonia visual |
-
+| ![#8C0368](https://placehold.co/18x18/8C0368/8C0368.png) Bordô Profundo | `#8C0368` | Autoridade, confiança e proteção |
+| ![#BF04A0](https://placehold.co/18x18/BF04A0/BF04A0.png) Magenta Escuro | `#BF04A0` | Empatia, acolhimento e identificação com o público-alvo |
+| ![#FFFFFF](https://placehold.co/18x18/FFFFFF/000000.png) Branco | `#FFFFFF` | Legibilidade, clareza e harmonia visual |
+ 
 ---
 
 ## 📋 Pré-requisitos
