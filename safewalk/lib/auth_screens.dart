@@ -1,3 +1,4 @@
+import 'home_screens.dart';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
@@ -147,10 +148,13 @@ class _LoginScreenState extends State<LoginScreen> {
         if (!mounted) return;
         // Login bem-sucedido — navegue para a tela principal do app
         // Exemplo: Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => HomeScreen()));
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Bem-vindo! ${data['usuario']['email']}'),
-            backgroundColor: kPrimary,
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => HomeShell(
+              usuarioId: data['usuario']['id'],
+              usuarioEmail: data['usuario']['email'],
+            ),
           ),
         );
       } else {
