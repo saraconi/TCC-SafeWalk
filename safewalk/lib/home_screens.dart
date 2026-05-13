@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 
 // =============================================
 // Safe Walk - Telas principais do app
@@ -47,6 +48,7 @@ class _HomeShellState extends State<HomeShell> {
     _telas = [
       HomeScreen(usuarioId: widget.usuarioId, usuarioEmail: widget.usuarioEmail, onNavigate: _navegarPara),
       AudiosScreen(usuarioId: widget.usuarioId),
+      const PalavraChaveScreen(),
       ContatosScreen(usuarioId: widget.usuarioId),
       PerfilScreen(usuarioId: widget.usuarioId, usuarioEmail: widget.usuarioEmail),
     ];
@@ -76,6 +78,7 @@ class _HomeShellState extends State<HomeShell> {
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.home_outlined), activeIcon: Icon(Icons.home), label: 'Início'),
           BottomNavigationBarItem(icon: Icon(Icons.mic_none), activeIcon: Icon(Icons.mic), label: 'Áudios'),
+          BottomNavigationBarItem(icon: Icon(Icons.record_voice_over_outlined), activeIcon: Icon(Icons.record_voice_over), label: 'Palavra-chave'),
           BottomNavigationBarItem(icon: Icon(Icons.people_outline), activeIcon: Icon(Icons.people), label: 'Contatos'),
           BottomNavigationBarItem(icon: Icon(Icons.person_outline), activeIcon: Icon(Icons.person), label: 'Perfil'),
         ],
@@ -147,10 +150,17 @@ class HomeScreen extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             _CardAtalho(
+              icone: Icons.record_voice_over,
+              titulo: 'Palavra-chave',
+              subtitulo: 'Configure sua palavra de ativação',
+              onTap: () => onNavigate(2),
+            ),
+            const SizedBox(height: 16),
+            _CardAtalho(
               icone: Icons.people,
               titulo: 'Contatos de Emergência',
               subtitulo: 'Gerencie seus contatos de confiança',
-              onTap: () => onNavigate(2),
+              onTap: () => onNavigate(3),
             ),
           ],
         ),
@@ -751,6 +761,299 @@ class _CampoDialog extends StatelessWidget {
           borderSide: BorderSide.none,
         ),
         contentPadding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────
+// Tela de Palavra-chave
+// ─────────────────────────────────────────────
+class PalavraChaveScreen extends StatefulWidget {
+  const PalavraChaveScreen({super.key});
+
+  @override
+  State<PalavraChaveScreen> createState() => _PalavraChaveScreenState();
+}
+
+class _PalavraChaveScreenState extends State<PalavraChaveScreen> {
+  final _palavraCtrl = TextEditingController();
+  String? _palavraSalva;
+  bool _ativa = false;
+  bool _salvando = false;
+
+  static const _kPalavraKey = 'palavra_chave';
+  static const _kAtivaKey   = 'palavra_chave_ativa';
+
+  @override
+  void initState() {
+    super.initState();
+    _carregarPrefs();
+  }
+
+  Future<void> _carregarPrefs() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _palavraSalva = prefs.getString(_kPalavraKey);
+      _ativa        = prefs.getBool(_kAtivaKey) ?? false;
+      if (_palavraSalva != null) _palavraCtrl.text = _palavraSalva!;
+    });
+  }
+
+  Future<void> _salvar() async {
+    final palavra = _palavraCtrl.text.trim();
+    if (palavra.isEmpty) {
+      _mostrarSnack('Digite uma palavra ou frase antes de salvar.');
+      return;
+    }
+    if (palavra.split(' ').length > 3) {
+      _mostrarSnack('Use no máximo 3 palavras para melhor reconhecimento.');
+      return;
+    }
+    setState(() => _salvando = true);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_kPalavraKey, palavra);
+    await prefs.setBool(_kAtivaKey, _ativa);
+    setState(() { _palavraSalva = palavra; _salvando = false; });
+    _mostrarSnack('Palavra-chave salva com sucesso!');
+  }
+
+  Future<void> _toggleAtiva(bool value) async {
+    if (_palavraSalva == null || _palavraSalva!.isEmpty) {
+      _mostrarSnack('Salve uma palavra-chave antes de ativar.');
+      return;
+    }
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_kAtivaKey, value);
+    setState(() => _ativa = value);
+  }
+
+  Future<void> _remover() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_kPalavraKey);
+    await prefs.remove(_kAtivaKey);
+    setState(() { _palavraSalva = null; _ativa = false; _palavraCtrl.clear(); });
+    _mostrarSnack('Palavra-chave removida.');
+  }
+
+  void _mostrarSnack(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(msg), backgroundColor: kPrimary,
+          behavior: SnackBarBehavior.floating, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
+    );
+  }
+
+  @override
+  void dispose() {
+    _palavraCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header
+            Row(
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: kPrimary.withValues(alpha: 0.12),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.record_voice_over, color: kPrimary, size: 24),
+                ),
+                const SizedBox(width: 14),
+                const Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Palavra-chave',
+                        style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                    Text('Ativação por voz', style: TextStyle(fontSize: 12, color: kGrey)),
+                  ],
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Configure a palavra ou frase que irá acionar o Safe Walk em segundo plano.',
+              style: TextStyle(fontSize: 13, color: kGrey, height: 1.5),
+            ),
+            const SizedBox(height: 24),
+
+            // Status card
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: _ativa ? kPrimary.withValues(alpha: 0.08) : const Color(0xFFF0F0F0),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: _ativa ? kPrimary.withValues(alpha: 0.3) : Colors.transparent,
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    _ativa ? Icons.shield : Icons.shield_outlined,
+                    color: _ativa ? kPrimary : kGrey,
+                    size: 28,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _ativa ? 'Ativação por voz ligada' : 'Ativação por voz desligada',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                            color: _ativa ? kPrimary : kGrey,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          _palavraSalva != null
+                              ? 'Palavra: "$_palavraSalva"'
+                              : 'Nenhuma palavra configurada',
+                          style: const TextStyle(fontSize: 12, color: kGrey),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Switch(
+                    value: _ativa,
+                    onChanged: _toggleAtiva,
+                    activeColor: kPrimary,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+
+            // Campo de palavra-chave
+            const Text('Palavra ou frase de ativação',
+                style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _palavraCtrl,
+              textCapitalization: TextCapitalization.none,
+              style: const TextStyle(fontSize: 15),
+              decoration: InputDecoration(
+                hintText: 'Ex: socorro, ajuda, emergência',
+                hintStyle: const TextStyle(color: kGrey),
+                prefixIcon: const Icon(Icons.mic_outlined, color: kPrimary),
+                filled: true,
+                fillColor: kCard,
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: BorderSide(color: kPrimary.withValues(alpha: 0.3)),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: const BorderSide(color: kPrimary, width: 1.5),
+                ),
+                contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+              ),
+            ),
+            const SizedBox(height: 8),
+
+            // Dica
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFF8E1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.lightbulb_outline, color: Color(0xFFF9A825), size: 18),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Use palavras curtas e únicas (até 3 palavras) para melhor precisão no reconhecimento. Evite palavras muito comuns do dia a dia.',
+                      style: TextStyle(fontSize: 12, color: Color(0xFF5D4037), height: 1.4),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            // Botão salvar
+            SizedBox(
+              width: double.infinity,
+              height: 50,
+              child: ElevatedButton.icon(
+                onPressed: _salvando ? null : _salvar,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: kPrimary,
+                  foregroundColor: kWhite,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  disabledBackgroundColor: kPrimary.withValues(alpha: 0.5),
+                ),
+                icon: _salvando
+                    ? const SizedBox(width: 18, height: 18,
+                        child: CircularProgressIndicator(color: kWhite, strokeWidth: 2))
+                    : const Icon(Icons.save_outlined),
+                label: Text(_salvando ? 'Salvando...' : 'Salvar palavra-chave',
+                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+              ),
+            ),
+
+            // Botão remover (só aparece se tiver palavra salva)
+            if (_palavraSalva != null) ...[
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: OutlinedButton.icon(
+                  onPressed: _remover,
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: kPrimary,
+                    side: BorderSide(color: kPrimary.withValues(alpha: 0.5)),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  ),
+                  icon: const Icon(Icons.delete_outline, size: 20),
+                  label: const Text('Remover palavra-chave',
+                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+                ),
+              ),
+            ],
+
+            const SizedBox(height: 24),
+
+            // Aviso Picovoice
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: kPrimary.withValues(alpha: 0.06),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: kPrimary.withValues(alpha: 0.15)),
+              ),
+              child: const Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.info_outline, color: kPrimary, size: 20),
+                  SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'O reconhecimento de voz utiliza o Porcupine da Picovoice e será ativado em segundo plano após configurar a chave de API.',
+                      style: TextStyle(fontSize: 12, color: kPrimary, height: 1.5),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
