@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'emergency_service.dart';
 
 // =============================================
 // Safe Walk - Telas principais do app
@@ -766,9 +767,44 @@ class _CampoDialog extends StatelessWidget {
   }
 }
 
+// =============================================
+// Safe Walk - Tela de Palavra-chave (integrada)
+// Substitua a classe PalavraChaveScreen no
+// home_screens.dart por este conteúdo
+// =============================================
+//
+// DEPENDÊNCIAS no pubspec.yaml:
+//   shared_preferences: ^2.3.2
+//   porcupine_flutter: ^3.0.1
+//   permission_handler: ^11.3.1
+//
+// Após adicionar, rode: flutter pub get
+// =============================================
+
 // ─────────────────────────────────────────────
-// Tela de Palavra-chave
+// Tela de Palavra-chave (cole no home_screens.dart
+// substituindo a classe PalavraChaveScreen existente)
 // ─────────────────────────────────────────────
+
+// =============================================
+// Safe Walk - Tela de Palavra-chave (integrada)
+// Substitua a classe PalavraChaveScreen no
+// home_screens.dart por este conteúdo
+// =============================================
+//
+// DEPENDÊNCIAS no pubspec.yaml:
+//   shared_preferences: ^2.3.2
+//   porcupine_flutter: ^3.0.1
+//   permission_handler: ^11.3.1
+//
+// Após adicionar, rode: flutter pub get
+// =============================================
+
+// ─────────────────────────────────────────────
+// Tela de Palavra-chave (cole no home_screens.dart
+// substituindo a classe PalavraChaveScreen existente)
+// ─────────────────────────────────────────────
+
 class PalavraChaveScreen extends StatefulWidget {
   const PalavraChaveScreen({super.key});
 
@@ -777,25 +813,25 @@ class PalavraChaveScreen extends StatefulWidget {
 }
 
 class _PalavraChaveScreenState extends State<PalavraChaveScreen> {
-  final _palavraCtrl = TextEditingController();
+  final _palavraCtrl    = TextEditingController();
+  bool  _servicoAtivo   = false;
+  bool  _carregando     = false;
   String? _palavraSalva;
-  bool _ativa = false;
-  bool _salvando = false;
 
-  static const _kPalavraKey = 'palavra_chave';
-  static const _kAtivaKey   = 'palavra_chave_ativa';
+  static const _kPalavra    = 'palavra_chave';
 
   @override
   void initState() {
     super.initState();
-    _carregarPrefs();
+    _carregar();
   }
 
-  Future<void> _carregarPrefs() async {
+  Future<void> _carregar() async {
     final prefs = await SharedPreferences.getInstance();
+    final ativo = await EmergencyServiceBridge.estaAtivo();
     setState(() {
-      _palavraSalva = prefs.getString(_kPalavraKey);
-      _ativa        = prefs.getBool(_kAtivaKey) ?? false;
+      _palavraSalva    = prefs.getString(_kPalavra);
+      _servicoAtivo    = ativo;
       if (_palavraSalva != null) _palavraCtrl.text = _palavraSalva!;
     });
   }
@@ -803,44 +839,67 @@ class _PalavraChaveScreenState extends State<PalavraChaveScreen> {
   Future<void> _salvar() async {
     final palavra = _palavraCtrl.text.trim();
     if (palavra.isEmpty) {
-      _mostrarSnack('Digite uma palavra ou frase antes de salvar.');
+      _snack('Digite uma palavra-chave antes de salvar.');
       return;
     }
-    if (palavra.split(' ').length > 3) {
-      _mostrarSnack('Use no máximo 3 palavras para melhor reconhecimento.');
+    setState(() => _carregando = true);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_kPalavra, palavra);
+    setState(() {
+      _palavraSalva = palavra;
+      _carregando   = false;
+    });
+    _snack('Configurações salvas!');
+  }
+
+  Future<void> _toggleServico(bool ligar) async {
+    if (_palavraSalva == null) {
+      _snack('Salve uma palavra-chave antes de ativar.');
       return;
     }
-    setState(() => _salvando = true);
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_kPalavraKey, palavra);
-    await prefs.setBool(_kAtivaKey, _ativa);
-    setState(() { _palavraSalva = palavra; _salvando = false; });
-    _mostrarSnack('Palavra-chave salva com sucesso!');
-  }
+    setState(() => _carregando = true);
 
-  Future<void> _toggleAtiva(bool value) async {
-    if (_palavraSalva == null || _palavraSalva!.isEmpty) {
-      _mostrarSnack('Salve uma palavra-chave antes de ativar.');
-      return;
+    if (ligar) {
+      // Busca contatos do banco para enviar no SMS
+      final contatos = await _buscarNumerosContatos();
+      final ok = await EmergencyServiceBridge.iniciar(
+        keyword:  _palavraSalva!,
+        contatos: contatos,
+      );
+      setState(() { _servicoAtivo = ok; _carregando = false; });
+      _snack(ok ? 'Safe Walk ativo! Ouvindo em segundo plano.' : 'Erro ao ativar. Verifique a AccessKey.');
+    } else {
+      await EmergencyServiceBridge.parar();
+      setState(() { _servicoAtivo = false; _carregando = false; });
+      _snack('Safe Walk desativado.');
     }
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(_kAtivaKey, value);
-    setState(() => _ativa = value);
   }
 
-  Future<void> _remover() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_kPalavraKey);
-    await prefs.remove(_kAtivaKey);
-    setState(() { _palavraSalva = null; _ativa = false; _palavraCtrl.clear(); });
-    _mostrarSnack('Palavra-chave removida.');
+  Future<List<String>> _buscarNumerosContatos() async {
+    // Busca contatos da API para pegar os telefones
+    try {
+      final prefs    = await SharedPreferences.getInstance();
+      final uid      = prefs.getInt('usuario_id') ?? 0;
+      final response = await http.post(
+        Uri.parse(kDadosUrl),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'acao': 'listar_contatos', 'usuario_id': uid}),
+      ).timeout(const Duration(seconds: 8));
+      final data     = jsonDecode(response.body);
+      final contatos = List<Map<String, dynamic>>.from(data['contatos'] ?? []);
+      return contatos.map((c) => c['telefone'].toString()).toList();
+    } catch (_) {
+      return [];
+    }
   }
 
-  void _mostrarSnack(String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(msg), backgroundColor: kPrimary,
-          behavior: SnackBarBehavior.floating, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
-    );
+  void _snack(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(msg),
+      backgroundColor: kPrimary,
+      behavior: SnackBarBehavior.floating,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+    ));
   }
 
   @override
@@ -858,179 +917,132 @@ class _PalavraChaveScreenState extends State<PalavraChaveScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Header
-            Row(
-              children: [
-                Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: kPrimary.withValues(alpha: 0.12),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(Icons.record_voice_over, color: kPrimary, size: 24),
-                ),
-                const SizedBox(width: 14),
-                const Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Palavra-chave',
-                        style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-                    Text('Ativação por voz', style: TextStyle(fontSize: 12, color: kGrey)),
-                  ],
-                ),
-              ],
-            ),
+            Row(children: [
+              Container(
+                width: 44, height: 44,
+                decoration: BoxDecoration(
+                  color: kPrimary.withValues(alpha: 0.12), shape: BoxShape.circle),
+                child: const Icon(Icons.record_voice_over, color: kPrimary, size: 24),
+              ),
+              const SizedBox(width: 14),
+              const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text('Palavra-chave',
+                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                Text('Ativação por voz', style: TextStyle(fontSize: 12, color: kGrey)),
+              ]),
+            ]),
             const SizedBox(height: 8),
             const Text(
-              'Configure a palavra ou frase que irá acionar o Safe Walk em segundo plano.',
+              'Configure a palavra que irá acionar o alarme e gravar áudio automaticamente.',
               style: TextStyle(fontSize: 13, color: kGrey, height: 1.5),
             ),
             const SizedBox(height: 24),
 
-            // Status card
+            // Card de status
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: _ativa ? kPrimary.withValues(alpha: 0.08) : const Color(0xFFF0F0F0),
+                color: _servicoAtivo
+                    ? kPrimary.withValues(alpha: 0.08)
+                    : const Color(0xFFF0F0F0),
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(
-                  color: _ativa ? kPrimary.withValues(alpha: 0.3) : Colors.transparent,
-                ),
+                  color: _servicoAtivo
+                      ? kPrimary.withValues(alpha: 0.3)
+                      : Colors.transparent),
               ),
-              child: Row(
-                children: [
-                  Icon(
-                    _ativa ? Icons.shield : Icons.shield_outlined,
-                    color: _ativa ? kPrimary : kGrey,
-                    size: 28,
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          _ativa ? 'Ativação por voz ligada' : 'Ativação por voz desligada',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 14,
-                            color: _ativa ? kPrimary : kGrey,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          _palavraSalva != null
-                              ? 'Palavra: "$_palavraSalva"'
-                              : 'Nenhuma palavra configurada',
-                          style: const TextStyle(fontSize: 12, color: kGrey),
-                        ),
-                      ],
+              child: Row(children: [
+                Icon(
+                  _servicoAtivo ? Icons.shield : Icons.shield_outlined,
+                  color: _servicoAtivo ? kPrimary : kGrey, size: 28,
+                ),
+                const SizedBox(width: 12),
+                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(
+                    _servicoAtivo ? 'Safe Walk ouvindo...' : 'Safe Walk desativado',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold, fontSize: 14,
+                      color: _servicoAtivo ? kPrimary : kGrey,
                     ),
                   ),
-                  Switch(
-                    value: _ativa,
-                    onChanged: _toggleAtiva,
-                    activeColor: kPrimary,
+                  const SizedBox(height: 2),
+                  Text(
+                    _palavraSalva != null
+                        ? 'Palavra: "$_palavraSalva"'
+                        : 'Nenhuma palavra configurada',
+                    style: const TextStyle(fontSize: 12, color: kGrey),
                   ),
-                ],
-              ),
+                ])),
+                _carregando
+                    ? const SizedBox(width: 24, height: 24,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: kPrimary))
+                    : Switch(
+                        value: _servicoAtivo,
+                        onChanged: _toggleServico,
+                        activeColor: kPrimary,
+                      ),
+              ]),
             ),
             const SizedBox(height: 24),
 
-            // Campo de palavra-chave
+            // Campo palavra-chave
             const Text('Palavra ou frase de ativação',
                 style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
             const SizedBox(height: 8),
             TextField(
               controller: _palavraCtrl,
-              textCapitalization: TextCapitalization.none,
               style: const TextStyle(fontSize: 15),
               decoration: InputDecoration(
                 hintText: 'Ex: socorro, ajuda, emergência',
                 hintStyle: const TextStyle(color: kGrey),
                 prefixIcon: const Icon(Icons.mic_outlined, color: kPrimary),
-                filled: true,
-                fillColor: kCard,
+                filled: true, fillColor: kCard,
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(14),
-                  borderSide: BorderSide(color: kPrimary.withValues(alpha: 0.3)),
-                ),
+                  borderSide: BorderSide(color: kPrimary.withValues(alpha: 0.3))),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(14),
-                  borderSide: const BorderSide(color: kPrimary, width: 1.5),
-                ),
+                  borderSide: const BorderSide(color: kPrimary, width: 1.5)),
                 contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 16),
 
-            // Dica
+            // Dica palavra
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
                 color: const Color(0xFFFFF8E1),
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: const Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Icon(Icons.lightbulb_outline, color: Color(0xFFF9A825), size: 18),
-                  SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Use palavras curtas e únicas (até 3 palavras) para melhor precisão no reconhecimento. Evite palavras muito comuns do dia a dia.',
-                      style: TextStyle(fontSize: 12, color: Color(0xFF5D4037), height: 1.4),
-                    ),
-                  ),
-                ],
-              ),
+              child: const Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Icon(Icons.lightbulb_outline, color: Color(0xFFF9A825), size: 18),
+                SizedBox(width: 8),
+                Expanded(child: Text(
+                  'A palavra-chave deve ser cadastrada também no Console do Picovoice em português. O arquivo .ppn gerado deve ser adicionado em assets/keyword_files/ do projeto.',
+                  style: TextStyle(fontSize: 12, color: Color(0xFF5D4037), height: 1.4),
+                )),
+              ]),
             ),
             const SizedBox(height: 20),
 
             // Botão salvar
             SizedBox(
-              width: double.infinity,
-              height: 50,
+              width: double.infinity, height: 50,
               child: ElevatedButton.icon(
-                onPressed: _salvando ? null : _salvar,
+                onPressed: _carregando ? null : _salvar,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: kPrimary,
-                  foregroundColor: kWhite,
+                  backgroundColor: kPrimary, foregroundColor: kWhite,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                  disabledBackgroundColor: kPrimary.withValues(alpha: 0.5),
                 ),
-                icon: _salvando
-                    ? const SizedBox(width: 18, height: 18,
-                        child: CircularProgressIndicator(color: kWhite, strokeWidth: 2))
-                    : const Icon(Icons.save_outlined),
-                label: Text(_salvando ? 'Salvando...' : 'Salvar palavra-chave',
-                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                icon: const Icon(Icons.save_outlined),
+                label: const Text('Salvar configurações',
+                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
               ),
             ),
 
-            // Botão remover (só aparece se tiver palavra salva)
-            if (_palavraSalva != null) ...[
-              const SizedBox(height: 12),
-              SizedBox(
-                width: double.infinity,
-                height: 50,
-                child: OutlinedButton.icon(
-                  onPressed: _remover,
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: kPrimary,
-                    side: BorderSide(color: kPrimary.withValues(alpha: 0.5)),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                  ),
-                  icon: const Icon(Icons.delete_outline, size: 20),
-                  label: const Text('Remover palavra-chave',
-                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
-                ),
-              ),
-            ],
-
-            const SizedBox(height: 24),
-
-            // Aviso Picovoice
+            // Aviso SMS
+            const SizedBox(height: 16),
             Container(
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
@@ -1038,19 +1050,14 @@ class _PalavraChaveScreenState extends State<PalavraChaveScreen> {
                 borderRadius: BorderRadius.circular(14),
                 border: Border.all(color: kPrimary.withValues(alpha: 0.15)),
               ),
-              child: const Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Icon(Icons.info_outline, color: kPrimary, size: 20),
-                  SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      'O reconhecimento de voz utiliza o Porcupine da Picovoice e será ativado em segundo plano após configurar a chave de API.',
-                      style: TextStyle(fontSize: 12, color: kPrimary, height: 1.5),
-                    ),
-                  ),
-                ],
-              ),
+              child: const Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Icon(Icons.sms_outlined, color: kPrimary, size: 20),
+                SizedBox(width: 10),
+                Expanded(child: Text(
+                  'Ao detectar a palavra-chave, um SMS de emergência será enviado automaticamente para todos os seus contatos cadastrados e o áudio será gravado.',
+                  style: TextStyle(fontSize: 12, color: kPrimary, height: 1.5),
+                )),
+              ]),
             ),
           ],
         ),
