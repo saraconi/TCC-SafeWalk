@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="assets/logo.png" alt="SafeWalk Logo" width="120"/>
+<img src="Logo/SafeWalk - Logo.png" alt="SafeWalk Logo" width="120"/>
 
 # 🛡️ SafeWalk — Seu Segurança Virtual
 
