@@ -12,7 +12,7 @@ import 'package:http/http.dart' as http;
 
 // URL base da API — 10.0.2.2 = localhost no emulador Android
 // Se usar dispositivo físico, troque pelo IP local da sua máquina (ex: 192.168.1.x)
-const String kBaseUrl = 'http://10.0.2.2/safewalk_api/auth.php';
+const String kBaseUrl = 'http://192.168.0.17/safewalk_api/auth.php';
 
 // ─────────────────────────────────────────────
 // Cores do tema Safe Walk
@@ -59,21 +59,14 @@ class WelcomeScreen extends StatelessWidget {
               ),
               const SizedBox(height: 32),
 
-              // Ilustração placeholder
+              // Logo da flor e borboleta centralizada e maior
               Expanded(
                 child: Center(
-                  child: Container(
-                    width: 220,
-                    height: 220,
-                    decoration: BoxDecoration(
-                      color: kPrimaryLight.withOpacity(0.2),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.shield_outlined,
-                      size: 100,
-                      color: kPrimary,
-                    ),
+                  child: Image.asset(
+                    'assets/logo.png', // Substitua pelo nome correto do arquivo
+                    width: 420, // Aumentado de 220 para 320 para ficar maior
+                    height: 420, // Aumentado de 220 para 320 para ficar maior
+                    fit: BoxFit.contain, // Garante que a logo cresça sem distorcer
                   ),
                 ),
               ),

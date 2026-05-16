@@ -72,32 +72,39 @@ class EmergencyService : Service() {
 
     private fun startPorcupine(accessKey: String, keyword: String) {
         try {
-            // Tenta usar keyword built-in; se não encontrar, usa arquivo .ppn em assets
+            android.util.Log.d("EmergencyService", "Iniciando Porcupine com keyword: $keyword")
+
             val builtIn = Porcupine.BuiltInKeyword.values().firstOrNull { kw ->
                 kw.name.equals(keyword, ignoreCase = true)
             }
 
+            android.util.Log.d("EmergencyService", "BuiltIn encontrado: $builtIn")
+
             val callback = PorcupineManagerCallback { _ ->
+                android.util.Log.d("EmergencyService", "Palavra-chave detectada!")
                 onKeywordDetected()
             }
 
             porcupineManager = if (builtIn != null) {
+                android.util.Log.d("EmergencyService", "Usando keyword built-in")
                 PorcupineManager.Builder()
                     .setAccessKey(accessKey)
                     .setKeyword(builtIn)
                     .build(applicationContext, callback)
             } else {
-                // Procura arquivo .ppn em assets/keyword_files/
-                val keywordPath = copyAssetToCache("keyword_files/$keyword.ppn")
+                // keyword já é o caminho completo do arquivo .ppn copiado pelo Flutter
+                android.util.Log.d("EmergencyService", "Carregando arquivo .ppn do caminho: $keyword")
                 PorcupineManager.Builder()
                     .setAccessKey(accessKey)
-                    .setKeywordPath(keywordPath)
+                    .setKeywordPath(keyword)
                     .build(applicationContext, callback)
             }
 
             porcupineManager?.start()
+            android.util.Log.d("EmergencyService", "Porcupine iniciado com sucesso!")
             updateNotification("Ouvindo — diga a palavra-chave para acionar")
         } catch (e: Exception) {
+            android.util.Log.e("EmergencyService", "Erro ao iniciar Porcupine: ${e.message}", e)
             updateNotification("Erro ao iniciar detecção: ${e.message}")
             stopSelf()
         }

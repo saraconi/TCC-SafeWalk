@@ -34,8 +34,11 @@ class MainActivity : FlutterActivity() {
                 when (call.method) {
 
                     "iniciarServico" -> {
+                        android.util.Log.d("MainActivity", "Recebido comando iniciarServico")
+                        val keyword = call.argument<String>("keyword") ?: ""
+                        android.util.Log.d("MainActivity", "Keyword: $keyword")
+
                         solicitarPermissoes()
-                        val keyword   = call.argument<String>("keyword") ?: ""
                         val contatos  = call.argument<List<String>>("contatos") ?: emptyList()
 
                         val intent = Intent(this, EmergencyService::class.java).apply {

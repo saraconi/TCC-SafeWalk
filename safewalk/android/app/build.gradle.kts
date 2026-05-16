@@ -45,5 +45,5 @@ flutter {
 
 
 dependencies {
-    implementation("ai.picovoice:porcupine-android:3.0.1")
+    implementation("ai.picovoice:porcupine-android:4.0.0")
 }

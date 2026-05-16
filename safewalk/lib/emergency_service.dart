@@ -15,13 +15,18 @@ class EmergencyServiceBridge {
     required List<String> contatos,
   }) async {
     try {
+      print('🔵 Chamando iniciarServico com keyword: $keyword');
       final result = await _channel.invokeMethod<bool>('iniciarServico', {
         'keyword': keyword,
         'contatos': contatos,
       });
+      print('🟢 Resultado: $result');
       return result ?? false;
     } on PlatformException catch (e) {
-      print('Erro ao iniciar serviço: ${e.message}');
+      print('🔴 Erro ao iniciar serviço: ${e.message}');
+      return false;
+    } catch (e) {
+      print('🔴 Erro inesperado: $e');
       return false;
     }
   }
