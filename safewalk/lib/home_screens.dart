@@ -6,13 +6,14 @@ import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'emergency_service.dart';
+import 'perfil_screens.dart';
 
 // =============================================
 // Safe Walk - Telas principais do app
 // Dependências: http: ^1.2.1
 // =============================================
 
-const String kDadosUrl = 'http://192.168.0.17/safewalk_api/dados.php';
+const String kDadosUrl = 'http://192.168.15.32/safewalk_api/dados.php';
 
 // Cores
 const Color kBg      = Color(0xFFF5F0FF);
@@ -676,8 +677,14 @@ class PerfilScreen extends StatelessWidget {
             const SizedBox(height: 32),
 
             // Opções de perfil
-            _ItemPerfil(icone: Icons.lock_outline, titulo: 'Alterar senha', onTap: () {}),
-            _ItemPerfil(icone: Icons.notifications_outlined, titulo: 'Notificações', onTap: () {}),
+            _ItemPerfil(icone: Icons.lock_outline, titulo: 'Alterar senha', onTap: () {
+              Navigator.push(context, MaterialPageRoute(
+                builder: (_) => AlterarSenhaScreen(usuarioId: usuarioId)));
+            }),
+            _ItemPerfil(icone: Icons.notifications_outlined, titulo: 'Notificações', onTap: () {
+              Navigator.push(context, MaterialPageRoute(
+                builder: (_) => const NotificacoesScreen()));
+            }),
             _ItemPerfil(icone: Icons.info_outline, titulo: 'Sobre o Safe Walk', onTap: () {}),
             const SizedBox(height: 16),
 

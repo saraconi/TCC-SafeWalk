@@ -3,20 +3,8 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
-// =============================================
-// Safe Walk - Telas de autenticação
-// Dependência: adicione no pubspec.yaml:
-//   dependencies:
-//     http: ^1.2.1
-// =============================================
+const String kBaseUrl = 'http://192.168.15.32/safewalk_api/auth.php';
 
-// URL base da API — 10.0.2.2 = localhost no emulador Android
-// Se usar dispositivo físico, troque pelo IP local da sua máquina (ex: 192.168.1.x)
-const String kBaseUrl = 'http://192.168.0.17/safewalk_api/auth.php';
-
-// ─────────────────────────────────────────────
-// Cores do tema Safe Walk
-// ─────────────────────────────────────────────
 const Color kBgColor     = Color(0xFFE8C8F0);
 const Color kPrimary     = Color(0xFF8B1A6B);
 const Color kPrimaryLight= Color(0xFFD966BB);
@@ -24,9 +12,6 @@ const Color kWhite       = Colors.white;
 const Color kFieldBg     = Color(0xFFF0E0F8);
 const Color kFieldBorder = Color(0xFF8B1A6B);
 
-// ─────────────────────────────────────────────
-// Tela de Boas-vindas (Welcome)
-// ─────────────────────────────────────────────
 class WelcomeScreen extends StatelessWidget {
   const WelcomeScreen({super.key});
 
@@ -38,9 +23,9 @@ class WelcomeScreen extends StatelessWidget {
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 24),
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              const SizedBox(height: 32),
-              // Título
+              const SizedBox(height: 16),
               const Text(
                 'Safe Walk',
                 style: TextStyle(
@@ -57,21 +42,20 @@ class WelcomeScreen extends StatelessWidget {
                   fontSize: 15,
                 ),
               ),
-              const SizedBox(height: 32),
 
-              // Logo da flor e borboleta centralizada e maior
               Expanded(
-                child: Center(
+                flex: 3,
+                child: Transform.translate(
+                  offset: const Offset(15, 0), // desloca 40px para a direita
                   child: Image.asset(
-                    'assets/logo.png', // Substitua pelo nome correto do arquivo
-                    width: 420, // Aumentado de 220 para 320 para ficar maior
-                    height: 420, // Aumentado de 220 para 320 para ficar maior
-                    fit: BoxFit.contain, // Garante que a logo cresça sem distorcer
+                    'assets/logo.png',
+                    width: 500,
+                    height: 500,
+                    fit: BoxFit.contain,
                   ),
                 ),
               ),
 
-              // Botões
               Row(
                 children: [
                   Expanded(
@@ -104,9 +88,6 @@ class WelcomeScreen extends StatelessWidget {
   }
 }
 
-// ─────────────────────────────────────────────
-// Tela de Login
-// ─────────────────────────────────────────────
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -139,8 +120,6 @@ class _LoginScreenState extends State<LoginScreen> {
 
       if (response.statusCode == 200) {
         if (!mounted) return;
-        // Login bem-sucedido — navegue para a tela principal do app
-        // Exemplo: Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => HomeScreen()));
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
@@ -204,7 +183,6 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               const SizedBox(height: 40),
 
-              // Campo e-mail
               _CampoTexto(
                 controller: _emailCtrl,
                 hint: 'Email',
@@ -213,7 +191,6 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               const SizedBox(height: 14),
 
-              // Campo senha
               _CampoTexto(
                 controller: _senhaCtrl,
                 hint: 'Senha',
@@ -229,7 +206,6 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
               ),
 
-              // Esqueceu a senha
               Align(
                 alignment: Alignment.centerRight,
                 child: TextButton(
@@ -241,7 +217,6 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
               ),
 
-              // Erro
               if (_erro != null) ...[
                 const SizedBox(height: 4),
                 Text(_erro!, style: const TextStyle(color: Colors.red, fontSize: 13)),
@@ -250,14 +225,12 @@ class _LoginScreenState extends State<LoginScreen> {
 
               const SizedBox(height: 8),
 
-              // Botão entrar
               _loading
                   ? const Center(child: CircularProgressIndicator(color: kPrimary))
                   : _BotaoPrimario(texto: 'Entrar', onTap: _login),
 
               const SizedBox(height: 14),
 
-              // Criar conta
               _BotaoSecundario(
                 texto: 'Criar conta',
                 onTap: () => Navigator.pushReplacement(
@@ -273,9 +246,6 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 }
 
-// ─────────────────────────────────────────────
-// Tela de Cadastro
-// ─────────────────────────────────────────────
 class CadastroScreen extends StatefulWidget {
   const CadastroScreen({super.key});
 
@@ -438,10 +408,6 @@ class _CadastroScreenState extends State<CadastroScreen> {
     );
   }
 }
-
-// ─────────────────────────────────────────────
-// Widgets reutilizáveis
-// ─────────────────────────────────────────────
 
 class _CampoTexto extends StatelessWidget {
   final TextEditingController controller;
