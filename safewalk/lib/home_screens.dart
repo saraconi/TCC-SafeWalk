@@ -13,7 +13,7 @@ import 'perfil_screens.dart';
 // Dependências: http: ^1.2.1
 // =============================================
 
-const String kDadosUrl = 'http://192.168.137.137/safewalk_api/dados.php';
+const String kDadosUrl = 'http://10.0.2.2/safewalk_api/dados.php';
 
 // Cores
 const Color kBg      = Color(0xFFF5F0FF);
