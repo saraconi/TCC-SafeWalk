@@ -57,7 +57,8 @@ class _AlterarSenhaScreenState extends State<AlterarSenhaScreen> {
     setState(() { _loading = true; _erro = null; _sucesso = null; });
 
     try {
-      final url   = 'http://192.168.15.32/safewalk_api/auth.php';
+      final prefs = await SharedPreferences.getInstance();
+      final url   = prefs.getString('api_base_url') ?? 'http://192.168.137.137/safewalk_api/auth.php';
 
       final response = await http.post(
         Uri.parse(url),
@@ -374,4 +375,228 @@ Future<void> _salvarNotificacao(String mensagem) async {
       '${agora.hour.toString().padLeft(2, '0')}:${agora.minute.toString().padLeft(2, '0')}';
   lista.add('$mensagem||$data');
   await prefs.setStringList('notificacoes', lista);
+}
+
+// ─────────────────────────────────────────────
+// Tela Sobre o Safe Walk
+// ─────────────────────────────────────────────
+class SobreScreen extends StatelessWidget {
+  const SobreScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: _kBg,
+      appBar: AppBar(
+        backgroundColor: _kBg,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios, color: _kPrimary),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: const Text('Sobre o Safe Walk',
+            style: TextStyle(color: _kPrimary, fontWeight: FontWeight.bold)),
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+        child: Column(
+          children: [
+            // Logo
+            Align(
+              alignment: Alignment(0.1, 0.0), // 0.0 = centro, 1.0 = direita total, -1.0 = esquerda total
+              child: Image.asset(
+                'assets/logo.png',
+                width: 145,
+                height: 145,
+                fit: BoxFit.contain,
+              ),
+            ),
+            // Nome e versão
+            const Text('Safe Walk',
+                style: TextStyle(
+                    fontSize: 26,
+                    fontWeight: FontWeight.bold,
+                    color: _kPrimary)),
+            const SizedBox(height: 4),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              decoration: BoxDecoration(
+                color: _kPrimary.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: const Text('Versão 1.0.0',
+                  style: TextStyle(fontSize: 12, color: _kPrimary,
+                      fontWeight: FontWeight.w600)),
+            ),
+            const SizedBox(height: 8),
+            const Text('O seu segurança virtual',
+                style: TextStyle(fontSize: 14, color: _kGrey)),
+            const SizedBox(height: 24),
+
+            // Sobre o projeto
+            _SecaoSobre(
+              icone: Icons.info_outline,
+              titulo: 'Sobre o projeto',
+              conteudo:
+                  'O SafeWalk é um aplicativo mobile de segurança pessoal desenvolvido como Trabalho de Conclusão de Curso do curso Técnico em Desenvolvimento de Sistemas da Etec Professor Camargo Aranha.',
+            ),
+            const SizedBox(height: 16),
+
+            // Motivação
+            _SecaoSobre(
+              icone: Icons.favorite_outline,
+              titulo: 'Nossa motivação',
+              conteudo:
+                  'O projeto nasceu da necessidade de proteger grupos vulneráveis — mulheres, idosos e a comunidade LGBT+ — da violência cotidiana. Com 88,9% da população brasileira acima de 10 anos possuindo celular (IBGE, 2024), o smartphone se torna a ferramenta mais acessível e eficaz para oferecer segurança em tempo real.',
+            ),
+            const SizedBox(height: 16),
+
+            // Como funciona
+            _SecaoSobre(
+              icone: Icons.shield_outlined,
+              titulo: 'Como funciona',
+              conteudo:
+                  'O SafeWalk transforma o celular em um dispositivo de segurança ativa: ao detectar uma palavra-chave em segundo plano, o aplicativo automaticamente envia a localização do usuário para contatos de emergência, inicia gravação de áudio e aciona a polícia — tudo sem qualquer interação manual, e de forma discreta.',
+            ),
+            const SizedBox(height: 16),
+
+            // Recursos
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                color: _kCard,
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.04),
+                      blurRadius: 6)
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(children: [
+                    const Icon(Icons.star_outline, color: _kPrimary, size: 20),
+                    const SizedBox(width: 8),
+                    const Text('Recursos principais',
+                        style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 15,
+                            color: _kPrimary)),
+                  ]),
+                  const SizedBox(height: 12),
+                  _ItemRecurso('Detecção de palavra-chave em segundo plano'),
+                  _ItemRecurso('Envio automático de localização por SMS'),
+                  _ItemRecurso('Gravação de áudio automática'),
+                  _ItemRecurso('Gerenciamento de contatos de emergência'),
+                  _ItemRecurso('Sistema de login seguro com criptografia'),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Rodapé
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: _kPrimary.withValues(alpha: 0.06),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: _kPrimary.withValues(alpha: 0.15)),
+              ),
+              child: const Column(
+                children: [
+                  Text('Etec Professor Camargo Aranha',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                          color: _kPrimary)),
+                  SizedBox(height: 4),
+                  Text('Curso Técnico em Desenvolvimento de Sistemas',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 12, color: _kGrey)),
+                  SizedBox(height: 4),
+                  Text('Trabalho de Conclusão de Curso • 2026',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 12, color: _kGrey)),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SecaoSobre extends StatelessWidget {
+  final IconData icone;
+  final String titulo;
+  final String conteudo;
+
+  const _SecaoSobre({
+    required this.icone,
+    required this.titulo,
+    required this.conteudo,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: _kCard,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+              color: Colors.black.withValues(alpha: 0.04), blurRadius: 6)
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(children: [
+            Icon(icone, color: _kPrimary, size: 20),
+            const SizedBox(width: 8),
+            Text(titulo,
+                style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 15,
+                    color: _kPrimary)),
+          ]),
+          const SizedBox(height: 10),
+          Text(conteudo,
+              style: const TextStyle(
+                  fontSize: 13, color: Color(0xFF444444), height: 1.6)),
+        ],
+      ),
+    );
+  }
+}
+
+class _ItemRecurso extends StatelessWidget {
+  final String texto;
+  const _ItemRecurso(this.texto);
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.check_circle_outline, color: _kPrimary, size: 18),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(texto,
+                style: const TextStyle(fontSize: 13, color: Color(0xFF444444))),
+          ),
+        ],
+      ),
+    );
+  }
 }

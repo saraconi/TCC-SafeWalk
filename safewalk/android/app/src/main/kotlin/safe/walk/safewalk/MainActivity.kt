@@ -20,6 +20,7 @@ class MainActivity : FlutterActivity() {
     private val permissoesNecessarias = mutableListOf(
         Manifest.permission.RECORD_AUDIO,
         Manifest.permission.SEND_SMS,
+        Manifest.permission.CALL_PHONE,
     ).apply {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             add(Manifest.permission.POST_NOTIFICATIONS)
@@ -34,11 +35,8 @@ class MainActivity : FlutterActivity() {
                 when (call.method) {
 
                     "iniciarServico" -> {
-                        android.util.Log.d("MainActivity", "Recebido comando iniciarServico")
-                        val keyword = call.argument<String>("keyword") ?: ""
-                        android.util.Log.d("MainActivity", "Keyword: $keyword")
-
                         solicitarPermissoes()
+                        val keyword   = call.argument<String>("keyword") ?: ""
                         val contatos  = call.argument<List<String>>("contatos") ?: emptyList()
 
                         val intent = Intent(this, EmergencyService::class.java).apply {

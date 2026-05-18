@@ -176,6 +176,24 @@ class EmergencyService : Service() {
         }
     }
 
+    private fun ligarParaPolicia() {
+        if (ContextCompat.checkSelfPermission(this,
+                android.Manifest.permission.CALL_PHONE) != PackageManager.PERMISSION_GRANTED) {
+            android.util.Log.w("EmergencyService", "Permissão CALL_PHONE não concedida")
+            return
+        }
+        try {
+            val intent = android.content.Intent(android.content.Intent.ACTION_CALL).apply {
+                data = android.net.Uri.parse("tel:190")
+                flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK
+            }
+            startActivity(intent)
+            android.util.Log.d("EmergencyService", "Ligando para 190...")
+        } catch (e: Exception) {
+            android.util.Log.e("EmergencyService", "Erro ao ligar: ${e.message}")
+        }
+    }
+
     private fun getDeviceOwnerName(): String {
         val prefs = getSharedPreferences("safewalk_prefs", MODE_PRIVATE)
         return prefs.getString("usuario_email", "usuário") ?: "usuário"

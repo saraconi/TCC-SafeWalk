@@ -3,8 +3,6 @@
 // Safe Walk - API REST de autenticação (PHP)
 // Coloque esta pasta dentro do seu servidor
 // local (ex: XAMPP/htdocs/safewalk_api/)
-// Acesso: http://10.0.2.2/safewalk_api/auth.php
-// (10.0.2.2 é o localhost visto pelo emulador Android)
 // =============================================
 
 header("Content-Type: application/json; charset=UTF-8");
@@ -18,7 +16,6 @@ define('DB_USER', 'root');
 define('DB_PASS', '3028');
 define('DB_NAME', 'safewalk');
 define('DB_CHARSET', 'utf8mb4');
-
 
 // ---------- Conexão PDO ----------
 function getDB(): PDO {
@@ -42,20 +39,20 @@ function validarEmail(string $email): bool {
     return filter_var($email, FILTER_VALIDATE_EMAIL) !== false;
 }
 
-// ---------- Roteamento por ?acao= ----------
+// ---------- Roteamento ----------
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     responder(405, ['erro' => 'Método não permitido. Use POST.']);
 }
 
-$body  = json_decode(file_get_contents('php://input'), true) ?? [];
-$acao  = $body['acao'] ?? '';
+$body = json_decode(file_get_contents('php://input'), true) ?? [];
+$acao = $body['acao'] ?? '';
 
 switch ($acao) {
 
     // ==================== CADASTRO ====================
     case 'cadastrar':
-        $email = trim($body['email'] ?? '');
-        $senha = $body['senha'] ?? '';
+        $email    = trim($body['email'] ?? '');
+        $senha    = $body['senha'] ?? '';
         $confirma = $body['confirma_senha'] ?? '';
 
         if (!$email || !$senha || !$confirma) {
@@ -72,16 +69,13 @@ switch ($acao) {
         }
 
         try {
-            $db = getDB();
-
-            // Verifica se e-mail já existe
+            $db   = getDB();
             $stmt = $db->prepare("SELECT id FROM usuarios WHERE email = ?");
             $stmt->execute([$email]);
             if ($stmt->fetch()) {
                 responder(409, ['erro' => 'E-mail já cadastrado.']);
             }
 
-            // Salva com hash bcrypt (custo 12)
             $hash = password_hash($senha, PASSWORD_BCRYPT, ['cost' => 12]);
             $stmt = $db->prepare("INSERT INTO usuarios (email, senha_hash) VALUES (?, ?)");
             $stmt->execute([$email, $hash]);
@@ -106,13 +100,12 @@ switch ($acao) {
         }
 
         try {
-            $db = getDB();
+            $db   = getDB();
             $stmt = $db->prepare("SELECT id, email, senha_hash FROM usuarios WHERE email = ?");
             $stmt->execute([$email]);
             $usuario = $stmt->fetch();
 
-            // Verifica hash — mesmo tempo de resposta para e-mail inexistente (evita enumeração)
-            $hashFalso = '$2y$12$invalido.invalido.invalido.invalido.invalido.invali';
+            $hashFalso     = '$2y$12$invalido.invalido.invalido.invalido.invalido.invali';
             $hashVerificar = $usuario ? $usuario['senha_hash'] : $hashFalso;
 
             if (!$usuario || !password_verify($senha, $hashVerificar)) {
@@ -124,6 +117,38 @@ switch ($acao) {
                 'mensagem' => 'Login realizado com sucesso!',
                 'usuario'  => ['id' => $usuario['id'], 'email' => $usuario['email']],
             ]);
+        } catch (PDOException $e) {
+            responder(500, ['erro' => 'Erro interno. Tente novamente.']);
+        }
+        break;
+
+    // ==================== ALTERAR SENHA ====================
+    case 'alterar_senha':
+        $uid        = (int)($body['usuario_id'] ?? 0);
+        $senhaAtual = $body['senha_atual'] ?? '';
+        $novaSenha  = $body['nova_senha'] ?? '';
+
+        if (!$uid || !$senhaAtual || !$novaSenha) {
+            responder(400, ['erro' => 'Preencha todos os campos.']);
+        }
+        if (strlen($novaSenha) < 6) {
+            responder(400, ['erro' => 'A nova senha deve ter ao menos 6 caracteres.']);
+        }
+
+        try {
+            $db   = getDB();
+            $stmt = $db->prepare("SELECT senha_hash FROM usuarios WHERE id = ?");
+            $stmt->execute([$uid]);
+            $usuario = $stmt->fetch();
+
+            if (!$usuario || !password_verify($senhaAtual, $usuario['senha_hash'])) {
+                responder(401, ['erro' => 'Senha atual incorreta.']);
+            }
+
+            $novoHash = password_hash($novaSenha, PASSWORD_BCRYPT, ['cost' => 12]);
+            $db->prepare("UPDATE usuarios SET senha_hash = ? WHERE id = ?")->execute([$novoHash, $uid]);
+
+            responder(200, ['sucesso' => true, 'mensagem' => 'Senha alterada com sucesso!']);
         } catch (PDOException $e) {
             responder(500, ['erro' => 'Erro interno. Tente novamente.']);
         }

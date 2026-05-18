@@ -13,7 +13,7 @@ import 'perfil_screens.dart';
 // Dependências: http: ^1.2.1
 // =============================================
 
-const String kDadosUrl = 'http://192.168.15.32/safewalk_api/dados.php';
+const String kDadosUrl = 'http://192.168.137.137/safewalk_api/dados.php';
 
 // Cores
 const Color kBg      = Color(0xFFF5F0FF);
@@ -685,7 +685,10 @@ class PerfilScreen extends StatelessWidget {
               Navigator.push(context, MaterialPageRoute(
                 builder: (_) => const NotificacoesScreen()));
             }),
-            _ItemPerfil(icone: Icons.info_outline, titulo: 'Sobre o Safe Walk', onTap: () {}),
+            _ItemPerfil(icone: Icons.info_outline, titulo: 'Sobre o Safe Walk', onTap: () {
+              Navigator.push(context, MaterialPageRoute(
+                builder: (_) => const SobreScreen()));
+            }),
             const SizedBox(height: 16),
 
             // Logout
