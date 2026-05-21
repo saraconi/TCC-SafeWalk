@@ -2,6 +2,7 @@ import 'home_screens.dart';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'recuperar_senha_screen.dart';
 
 const String kBaseUrl = 'http://10.0.2.2/safewalk_api/auth.php';
 
@@ -209,7 +210,8 @@ class _LoginScreenState extends State<LoginScreen> {
               Align(
                 alignment: Alignment.centerRight,
                 child: TextButton(
-                  onPressed: () {},
+                  onPressed: () => Navigator.push(context,
+                    MaterialPageRoute(builder: (_) => const RecuperarSenhaScreen())),
                   child: const Text(
                     'Esqueceu sua senha?',
                     style: TextStyle(color: kPrimary, fontWeight: FontWeight.w600),

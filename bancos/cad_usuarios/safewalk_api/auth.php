@@ -47,6 +47,48 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 $body = json_decode(file_get_contents('php://input'), true) ?? [];
 $acao = $body['acao'] ?? '';
 
+// Função SMTP via SSL (Porta 465) totalmente funcional para Sockets nativos
+function enviarEmailSmtp(string $host, int $porta, string $usuario, string $senha, string $para, string $assunto, string $corpo): bool {
+    try {
+        $socket = fsockopen("ssl://$host", $porta, $errno, $errstr, 15);
+        if (!$socket) return false;
+
+        $lerResposta = function() use ($socket) {
+            $resp = '';
+            while ($linha = fgets($socket, 515)) {
+                $resp .= $linha;
+                if (isset($linha[3]) && $linha[3] == ' ') break;
+            }
+            return $resp;
+        };
+
+        $lerResposta(); // 220
+        fputs($socket, "EHLO localhost\r\n"); $lerResposta();
+        fputs($socket, "AUTH LOGIN\r\n"); $lerResposta();
+        fputs($socket, base64_encode($usuario) . "\r\n"); $lerResposta();
+        fputs($socket, base64_encode($senha) . "\r\n"); $lerResposta();
+        fputs($socket, "MAIL FROM: <$usuario>\r\n"); $lerResposta();
+        fputs($socket, "RCPT TO: <$para>\r\n"); $lerResposta();
+        fputs($socket, "DATA\r\n"); $lerResposta();
+        
+        // Cabeçalhos de e-mail bem formatados
+        $cabecalhos = "From: Safe Walk <$usuario>\r\n" .
+                      "To: <$para>\r\n" .
+                      "Subject: =?UTF-8?B?" . base64_encode($assunto) . "?=\r\n" .
+                      "Content-Type: text/plain; charset=UTF-8\r\n\r\n";
+                      
+        fputs($socket, $cabecalhos . $corpo . "\r\n.\r\n");
+        $resp = $lerResposta();
+        fputs($socket, "QUIT\r\n");
+        fclose($socket);
+        
+        return (strpos($resp, '250') !== false);
+    } catch (Exception $e) {
+        return false;
+    }
+}
+
+
 switch ($acao) {
 
     // ==================== CADASTRO ====================
@@ -86,7 +128,7 @@ switch ($acao) {
                 'usuario'  => ['id' => (int) $db->lastInsertId(), 'email' => $email],
             ]);
         } catch (PDOException $e) {
-            responder(500, ['erro' => 'Erro interno. Tente novamente.']);
+            responder(500, ['erro' => 'Erro interno ao cadastrar usuário.']);
         }
         break;
 
@@ -118,7 +160,7 @@ switch ($acao) {
                 'usuario'  => ['id' => $usuario['id'], 'email' => $usuario['email']],
             ]);
         } catch (PDOException $e) {
-            responder(500, ['erro' => 'Erro interno. Tente novamente.']);
+            responder(500, ['erro' => 'Erro interno ao realizar login.']);
         }
         break;
 
@@ -150,10 +192,124 @@ switch ($acao) {
 
             responder(200, ['sucesso' => true, 'mensagem' => 'Senha alterada com sucesso!']);
         } catch (PDOException $e) {
-            responder(500, ['erro' => 'Erro interno. Tente novamente.']);
+            responder(500, ['erro' => 'Erro interno ao alterar senha.']);
+        }
+        break;
+
+    // ==================== SOLICITAR RECUPERAÇÃO ====================
+    case 'solicitar_recuperacao':
+        $email = trim($body['email'] ?? '');
+
+        if (!$email || !validarEmail($email)) {
+            responder(400, ['erro' => 'E-mail inválido.']);
+        }
+
+        try {
+            $db   = getDB();
+            $stmt = $db->prepare("SELECT id FROM usuarios WHERE email = ?");
+            $stmt->execute([$email]);
+            $usuario = $stmt->fetch();
+
+            if (!$usuario) {
+                responder(200, ['sucesso' => true, 'mensagem' => 'Se o e-mail existir, você receberá o código.']);
+            }
+
+            // Gera token seguro de 6 dígitos
+            $token   = str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+            $expira  = date('Y-m-d H:i:s', strtotime('+15 minutes'));
+
+            // Cria de forma segura as colunas de controle caso elas não existam no MySQL
+            try {
+                @$db->exec("ALTER TABLE usuarios ADD COLUMN reset_token VARCHAR(10) NULL");
+                @$db->exec("ALTER TABLE usuarios ADD COLUMN reset_expira DATETIME NULL");
+            } catch (Exception $e) {
+                // Se as colunas já existirem, o MySQL joga um erro e o PHP simplesmente continua
+            }
+
+            $db->prepare("UPDATE usuarios SET reset_token = ?, reset_expira = ? WHERE email = ?")
+               ->execute([$token, $expira, $email]);
+
+            // Configuração ajustada para o Gmail SSL (Seguro e estável)
+            $host         = 'smtp.gmail.com';
+            $porta        = 465; // Mudado para 465 (SSL) para resolver o bug do socket
+            $usuario_smtp = 'safewalksuporte@gmail.com';
+            
+            // ⚠️ ATENÇÃO: Verifique sua senha abaixo. Ela precisa ter exatamente 16 letras!
+            $senha_smtp   = 'paibfimcpmjaaiob'; 
+            
+            $assunto  = 'Safe Walk - Código de recuperação de senha';
+            $corpo    = "Olá!\n\nSeu código de recuperação de senha é:\n\n$token\n\nEste código expira em 15 minutos.\n\nSe você não solicitou a recuperação, ignore este e-mail.\n\nEquipe Safe Walk";
+
+            $ok = enviarEmailSmtp($host, $porta, $usuario_smtp, $senha_smtp, $email, $assunto, $corpo);
+
+            if (!$ok) {
+                responder(500, ['erro' => 'Erro ao enviar e-mail. Verifique suas credenciais SMTP.']);
+            }
+
+            responder(200, ['sucesso' => true, 'mensagem' => 'Código enviado para seu e-mail.']);
+        } catch (PDOException $e) {
+            responder(500, ['erro' => 'Erro interno de banco: ' . $e->getMessage()]);
+        }
+        break;
+
+    // ==================== VERIFICAR TOKEN ====================
+    case 'verificar_token':
+        $email = trim($body['email'] ?? '');
+        $token = trim($body['token'] ?? '');
+
+        if (!$email || !$token) {
+            responder(400, ['erro' => 'Campos obrigatórios.']);
+        }
+
+        try {
+            $db   = getDB();
+            $stmt = $db->prepare("SELECT id FROM usuarios WHERE email = ? AND reset_token = ? AND reset_expira > NOW()");
+            $stmt->execute([$email, $token]);
+            $usuario = $stmt->fetch();
+
+            if (!$usuario) {
+                responder(401, ['erro' => 'Código inválido ou expirado.']);
+            }
+
+            responder(200, ['sucesso' => true]);
+        } catch (PDOException $e) {
+            responder(500, ['erro' => 'Erro interno de banco.']);
+        }
+        break;
+
+    // ==================== REDEFINIR SENHA ====================
+    case 'redefinir_senha':
+        $email     = trim($body['email'] ?? '');
+        $token     = trim($body['token'] ?? '');
+        $novaSenha = $body['nova_senha'] ?? '';
+
+        if (!$email || !$token || !$novaSenha) {
+            responder(400, ['erro' => 'Campos obrigatórios.']);
+        }
+        if (strlen($novaSenha) < 6) {
+            responder(400, ['erro' => 'A senha deve ter ao menos 6 caracteres.']);
+        }
+
+        try {
+            $db   = getDB();
+            $stmt = $db->prepare("SELECT id FROM usuarios WHERE email = ? AND reset_token = ? AND reset_expira > NOW()");
+            $stmt->execute([$email, $token]);
+            $usuario = $stmt->fetch();
+
+            if (!$usuario) {
+                responder(401, ['erro' => 'Código inválido ou expirado.']);
+            }
+
+            $hash = password_hash($novaSenha, PASSWORD_BCRYPT, ['cost' => 12]);
+            $db->prepare("UPDATE usuarios SET senha_hash = ?, reset_token = NULL, reset_expira = NULL WHERE email = ?")
+               ->execute([$hash, $email]);
+
+            responder(200, ['sucesso' => true, 'mensagem' => 'Senha redefinida com sucesso!']);
+        } catch (PDOException $e) {
+            responder(500, ['erro' => 'Erro interno de banco.']);
         }
         break;
 
     default:
-        responder(400, ['erro' => 'Ação inválida. Use "cadastrar" ou "login".']);
+        responder(400, ['erro' => 'Ação inválida.']);
 }
