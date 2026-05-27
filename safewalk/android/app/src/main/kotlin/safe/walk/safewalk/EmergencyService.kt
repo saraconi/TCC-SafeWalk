@@ -1,12 +1,10 @@
 package safe.walk.safewalk
 
-import ai.picovoice.porcupine.Porcupine
-import ai.picovoice.porcupine.PorcupineManager
-import ai.picovoice.porcupine.PorcupineManagerCallback
-import ai.picovoice.porcupine.PorcupineException
 import android.app.*
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.media.AudioFormat
+import android.media.AudioRecord
 import android.media.MediaRecorder
 import android.os.*
 import android.telephony.SmsManager
@@ -19,24 +17,30 @@ import java.util.*
 class EmergencyService : Service() {
 
     companion object {
-        const val CHANNEL_ID       = "safewalk_emergency"
-        const val NOTIFICATION_ID  = 1
-        const val ACTION_START     = "START"
-        const val ACTION_STOP      = "STOP"
-        const val ACTION_STOP_REC  = "STOP_REC"
-        const val EXTRA_KEYWORD    = "KEYWORD"
-        const val EXTRA_CONTACTS   = "CONTACTS"
-        const val ACCESS_KEY       = "8rxqU/GEgLxaYHfBeh/mp9JLA74oMZQ3wSOy1gUEzC6kw4MwrE94Bg=="
-        var isRunning              = false
+        const val CHANNEL_ID      = "safewalk_emergency"
+        const val NOTIFICATION_ID = 1
+        const val ACTION_START    = "START"
+        const val ACTION_STOP     = "STOP"
+        const val ACTION_STOP_REC = "STOP_REC"
+        const val ACTION_SIMULATE = "SIMULATE"
+        const val EXTRA_KEYWORD   = "KEYWORD"
+        const val EXTRA_CONTACTS  = "CONTACTS"
+        var isRunning             = false
     }
 
-    private var porcupineManager: PorcupineManager? = null
-    private var mediaRecorder: MediaRecorder?        = null
-    private var isRecording                          = false
-    private var contacts: ArrayList<String>          = arrayListOf()
-    private var currentAudioFile: String?            = null
+    private var keyword: String             = ""
+    private var contacts: ArrayList<String> = arrayListOf()
 
-    // ── Lifecycle ──────────────────────────────────────────────
+    // Vosk via reflexão
+    private var voskModel: Any?      = null
+    private var voskRecognizer: Any? = null
+    private var audioRecord: AudioRecord? = null
+    private var listenThread: Thread? = null
+    private var isListening           = false
+
+    // Gravação
+    private var mediaRecorder: MediaRecorder? = null
+    private var isRecording                   = false
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -49,80 +53,148 @@ class EmergencyService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             ACTION_START -> {
-                val keyword   = intent.getStringExtra(EXTRA_KEYWORD) ?: return START_NOT_STICKY
-                contacts      = intent.getStringArrayListExtra(EXTRA_CONTACTS) ?: arrayListOf()
-
-                startForeground(NOTIFICATION_ID, buildNotification("Aguardando palavra-chave..."))
-                startPorcupine(ACCESS_KEY, keyword)
+                keyword  = intent.getStringExtra(EXTRA_KEYWORD) ?: ""
+                contacts = intent.getStringArrayListExtra(EXTRA_CONTACTS) ?: arrayListOf()
+                startForeground(NOTIFICATION_ID, buildNotification("Inicializando reconhecimento de voz..."))
+                iniciarVosk()
             }
-            ACTION_STOP -> stopSelf()
+            ACTION_STOP     -> stopSelf()
             ACTION_STOP_REC -> stopRecording()
+            ACTION_SIMULATE -> {
+                stopListening()
+                startForeground(NOTIFICATION_ID, buildNotification("Modo de teste ativo"))
+                onKeywordDetected()
+            }
         }
         return START_STICKY
     }
 
     override fun onDestroy() {
         isRunning = false
-        stopPorcupine()
+        stopListening()
         stopRecording()
         super.onDestroy()
     }
 
-    // ── Porcupine ──────────────────────────────────────────────
+    // ── Vosk via Reflexão ─────────────────────────────────────
 
-    private fun startPorcupine(accessKey: String, keyword: String) {
-        try {
-            android.util.Log.d("EmergencyService", "Iniciando Porcupine com keyword: $keyword")
+    private fun iniciarVosk() {
+        Thread {
+            try {
+                android.util.Log.d("EmergencyService", "Carregando modelo Vosk via reflexão...")
+                updateNotification("Carregando modelo de voz...")
 
-            val builtIn = Porcupine.BuiltInKeyword.values().firstOrNull { kw ->
-                kw.name.equals(keyword, ignoreCase = true)
+                val modelDir = File(cacheDir, "vosk-model")
+                if (!modelDir.exists()) {
+                    copiarAssets("vosk-model", modelDir)
+                }
+
+                // Carrega Model via reflexão
+                val modelClass = Class.forName("com.alphacephei.vosk.Model")
+                voskModel = modelClass.getConstructor(String::class.java)
+                    .newInstance(modelDir.absolutePath)
+
+                // Carrega Recognizer via reflexão
+                val recClass = Class.forName("com.alphacephei.vosk.Recognizer")
+                voskRecognizer = recClass.getConstructor(modelClass, Float::class.java)
+                    .newInstance(voskModel, 16000.0f)
+
+                android.util.Log.d("EmergencyService", "Modelo Vosk carregado! Ouvindo por: $keyword")
+                updateNotification("Ouvindo — diga \"$keyword\" para acionar")
+                iniciarCaptura()
+
+            } catch (e: Exception) {
+                android.util.Log.e("EmergencyService", "Erro Vosk: ${e.message}", e)
+                updateNotification("Erro ao carregar reconhecimento: ${e.message}")
+                stopSelf()
             }
+        }.start()
+    }
 
-            android.util.Log.d("EmergencyService", "BuiltIn encontrado: $builtIn")
+    private fun iniciarCaptura() {
+        if (ContextCompat.checkSelfPermission(this,
+                android.Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) return
 
-            val callback = PorcupineManagerCallback { _ ->
-                android.util.Log.d("EmergencyService", "Palavra-chave detectada!")
-                onKeywordDetected()
+        val sampleRate = 16000
+        val bufferSize = AudioRecord.getMinBufferSize(
+            sampleRate, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT) * 4
+
+        audioRecord = AudioRecord(
+            MediaRecorder.AudioSource.MIC, sampleRate,
+            AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT, bufferSize)
+        audioRecord?.startRecording()
+        isListening = true
+
+        val recClass         = Class.forName("com.alphacephei.vosk.Recognizer")
+        val acceptMethod     = recClass.getMethod("acceptWaveForm", ByteArray::class.java, Int::class.java)
+        val resultMethod     = recClass.getMethod("getResult")
+        val partialMethod    = recClass.getMethod("getPartialResult")
+
+        listenThread = Thread {
+            val buffer = ShortArray(bufferSize / 2)
+            android.util.Log.d("EmergencyService", "Captura iniciada")
+
+            while (isListening) {
+                val lidos = audioRecord?.read(buffer, 0, buffer.size) ?: 0
+                if (lidos > 0) {
+                    val bytes = ByteArray(lidos * 2)
+                    for (i in 0 until lidos) {
+                        bytes[i * 2]     = (buffer[i].toInt() and 0xFF).toByte()
+                        bytes[i * 2 + 1] = (buffer[i].toInt() shr 8 and 0xFF).toByte()
+                    }
+                    val aceito = acceptMethod.invoke(voskRecognizer, bytes, bytes.size) as Boolean
+                    if (aceito) {
+                        val resultado = resultMethod.invoke(voskRecognizer) as? String ?: ""
+                        android.util.Log.d("EmergencyService", "Reconhecido: $resultado")
+                        verificarPalavraChave(resultado)
+                    } else {
+                        val parcial = partialMethod.invoke(voskRecognizer) as? String ?: ""
+                        if (parcial.isNotEmpty() && parcial != "{\"partial\" : \"\"}") {
+                            android.util.Log.d("EmergencyService", "Parcial: $parcial")
+                            verificarPalavraChave(parcial)
+                        }
+                    }
+                }
             }
+        }
+        listenThread?.start()
+    }
 
-            porcupineManager = if (builtIn != null) {
-                android.util.Log.d("EmergencyService", "Usando keyword built-in")
-                PorcupineManager.Builder()
-                    .setAccessKey(accessKey)
-                    .setKeyword(builtIn)
-                    .build(applicationContext, callback)
-            } else {
-                // keyword já é o caminho completo do arquivo .ppn copiado pelo Flutter
-                android.util.Log.d("EmergencyService", "Carregando arquivo .ppn do caminho: $keyword")
-                PorcupineManager.Builder()
-                    .setAccessKey(accessKey)
-                    .setKeywordPath(keyword)
-                    .build(applicationContext, callback)
-            }
-
-            porcupineManager?.start()
-            android.util.Log.d("EmergencyService", "Porcupine iniciado com sucesso!")
-            updateNotification("Ouvindo — diga a palavra-chave para acionar")
-        } catch (e: Exception) {
-            android.util.Log.e("EmergencyService", "Erro ao iniciar Porcupine: ${e.message}", e)
-            updateNotification("Erro ao iniciar detecção: ${e.message}")
-            stopSelf()
+    private fun verificarPalavraChave(texto: String) {
+        if (texto.lowercase().contains(keyword.lowercase())) {
+            android.util.Log.d("EmergencyService", "PALAVRA-CHAVE DETECTADA!")
+            isListening = false
+            onKeywordDetected()
         }
     }
 
-    private fun stopPorcupine() {
-        porcupineManager?.stop()
-        porcupineManager?.delete()
-        porcupineManager = null
+    private fun stopListening() {
+        isListening = false
+        listenThread?.interrupt()
+        listenThread = null
+        audioRecord?.stop()
+        audioRecord?.release()
+        audioRecord = null
+        try {
+            voskRecognizer?.let {
+                it.javaClass.getMethod("close").invoke(it)
+            }
+            voskModel?.let {
+                it.javaClass.getMethod("close").invoke(it)
+            }
+        } catch (_: Exception) {}
+        voskRecognizer = null
+        voskModel = null
     }
 
     private fun onKeywordDetected() {
-        updateNotification("⚠️ Palavra detectada! Gravando...")
+        updateNotification("⚠️ Palavra detectada! Gravando e acionando emergência...")
         sendSmsToContacts()
         startRecording()
+        ligarParaPolicia()
     }
 
-    // ── Gravação ───────────────────────────────────────────────
+    // ── Gravação ──────────────────────────────────────────────
 
     private fun startRecording() {
         if (isRecording) return
@@ -130,16 +202,14 @@ class EmergencyService : Service() {
                 android.Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) return
 
         val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
-        val fileName  = "emergencia_$timestamp.m4a"
-        val file      = File(getExternalFilesDir(null), fileName)
-        currentAudioFile = file.absolutePath
+        val file = File(getExternalFilesDir(null), "emergencia_$timestamp.m4a")
 
         mediaRecorder = (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S)
             MediaRecorder(this) else @Suppress("DEPRECATION") MediaRecorder()).apply {
             setAudioSource(MediaRecorder.AudioSource.MIC)
             setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
             setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
-            setOutputFile(currentAudioFile)
+            setOutputFile(file.absolutePath)
             prepare()
             start()
         }
@@ -148,81 +218,67 @@ class EmergencyService : Service() {
 
     private fun stopRecording() {
         if (!isRecording) return
-        try {
-            mediaRecorder?.stop()
-        } catch (_: Exception) {}
+        try { mediaRecorder?.stop() } catch (_: Exception) {}
         mediaRecorder?.release()
-        mediaRecorder  = null
-        isRecording    = false
-        updateNotification("Gravação encerrada. Ouvindo novamente...")
+        mediaRecorder = null
+        isRecording = false
+        updateNotification("Gravação encerrada.")
     }
 
-    // ── SMS ────────────────────────────────────────────────────
+    // ── SMS ───────────────────────────────────────────────────
 
     private fun sendSmsToContacts() {
         if (ContextCompat.checkSelfPermission(this,
                 android.Manifest.permission.SEND_SMS) != PackageManager.PERMISSION_GRANTED) return
 
-        val message = "🚨 EMERGÊNCIA Safe Walk: ${getDeviceOwnerName()} acionou o alarme de emergência. Localização: não disponível no momento."
+        val nome = getSharedPreferences("safewalk_prefs", MODE_PRIVATE)
+            .getString("usuario_email", "usuário") ?: "usuário"
+        val message = "🚨 EMERGÊNCIA Safe Walk: $nome acionou o alarme de emergência."
 
         val smsManager = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S)
             applicationContext.getSystemService(SmsManager::class.java)
         else @Suppress("DEPRECATION") SmsManager.getDefault()
 
         contacts.forEach { numero ->
-            try {
-                smsManager?.sendTextMessage(numero, null, message, null, null)
-            } catch (_: Exception) {}
+            try { smsManager?.sendTextMessage(numero, null, message, null, null) }
+            catch (_: Exception) {}
         }
     }
 
+    // ── Ligação ───────────────────────────────────────────────
+
     private fun ligarParaPolicia() {
         if (ContextCompat.checkSelfPermission(this,
-                android.Manifest.permission.CALL_PHONE) != PackageManager.PERMISSION_GRANTED) {
-            android.util.Log.w("EmergencyService", "Permissão CALL_PHONE não concedida")
-            return
-        }
+                android.Manifest.permission.CALL_PHONE) != PackageManager.PERMISSION_GRANTED) return
         try {
-            val intent = android.content.Intent(android.content.Intent.ACTION_CALL).apply {
-                data = android.net.Uri.parse("tel:190")
+            startActivity(android.content.Intent(android.content.Intent.ACTION_CALL).apply {
+                data  = android.net.Uri.parse("tel:190")
                 flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK
-            }
-            startActivity(intent)
-            android.util.Log.d("EmergencyService", "Ligando para 190...")
+            })
         } catch (e: Exception) {
             android.util.Log.e("EmergencyService", "Erro ao ligar: ${e.message}")
         }
     }
 
-    private fun getDeviceOwnerName(): String {
-        val prefs = getSharedPreferences("safewalk_prefs", MODE_PRIVATE)
-        return prefs.getString("usuario_email", "usuário") ?: "usuário"
-    }
-
-    // ── Notificação ────────────────────────────────────────────
+    // ── Notificação ───────────────────────────────────────────
 
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(
-                CHANNEL_ID,
-                "Safe Walk Emergência",
-                NotificationManager.IMPORTANCE_LOW
-            ).apply {
-                description = "Detecção de palavra-chave em segundo plano"
+            val channel = NotificationChannel(CHANNEL_ID, "Safe Walk Emergência",
+                NotificationManager.IMPORTANCE_LOW).apply {
+                description = "Reconhecimento de voz em segundo plano"
                 setShowBadge(false)
             }
-            getSystemService(NotificationManager::class.java)
-                .createNotificationChannel(channel)
+            getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
         }
     }
 
     private fun buildNotification(text: String): Notification {
-        val stopIntent = Intent(this, EmergencyService::class.java).apply { action = ACTION_STOP }
-        val stopPi    = PendingIntent.getService(this, 0, stopIntent,
+        val stopPi = PendingIntent.getService(this, 0,
+            Intent(this, EmergencyService::class.java).apply { action = ACTION_STOP },
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
-
-        val stopRecIntent = Intent(this, EmergencyService::class.java).apply { action = ACTION_STOP_REC }
-        val stopRecPi     = PendingIntent.getService(this, 1, stopRecIntent,
+        val stopRecPi = PendingIntent.getService(this, 1,
+            Intent(this, EmergencyService::class.java).apply { action = ACTION_STOP_REC },
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
 
         return NotificationCompat.Builder(this, CHANNEL_ID)
@@ -236,19 +292,24 @@ class EmergencyService : Service() {
     }
 
     private fun updateNotification(text: String) {
-        val nm = getSystemService(NotificationManager::class.java)
-        nm.notify(NOTIFICATION_ID, buildNotification(text))
+        getSystemService(NotificationManager::class.java)
+            .notify(NOTIFICATION_ID, buildNotification(text))
     }
 
-    // ── Utilitário ─────────────────────────────────────────────
+    // ── Utilitário ────────────────────────────────────────────
 
-    private fun copyAssetToCache(assetPath: String): String {
-        val outFile = File(cacheDir, File(assetPath).name)
-        if (!outFile.exists()) {
-            assets.open(assetPath).use { input ->
-                outFile.outputStream().use { output -> input.copyTo(output) }
+    private fun copiarAssets(assetPath: String, destino: File) {
+        destino.mkdirs()
+        assets.list(assetPath)?.forEach { arquivo ->
+            val subAsset = "$assetPath/$arquivo"
+            val subDest  = File(destino, arquivo)
+            try {
+                assets.open(subAsset).use { input ->
+                    subDest.outputStream().use { output -> input.copyTo(output) }
+                }
+            } catch (_: Exception) {
+                copiarAssets(subAsset, subDest)
             }
         }
-        return outFile.absolutePath
     }
 }

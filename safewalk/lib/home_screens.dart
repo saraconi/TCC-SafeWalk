@@ -1,9 +1,6 @@
 import 'dart:convert';
-import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
-import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'emergency_service.dart';
 import 'perfil_screens.dart';
@@ -13,7 +10,7 @@ import 'perfil_screens.dart';
 // Dependências: http: ^1.2.1
 // =============================================
 
-const String kDadosUrl = 'http://10.0.2.2/safewalk_api/dados.php';
+const String kDadosUrl = 'http://192.168.0.6/safewalk_api/dados.php';
 
 // Cores
 const Color kBg      = Color(0xFFF5F0FF);
@@ -836,7 +833,6 @@ class _PalavraChaveScreenState extends State<PalavraChaveScreen> {
   }
 
   Future<void> _toggleAtiva(bool value) async {
-    print('🔵 Toggle acionado: ligar=$value, _palavraSalva=$_palavraSalva');
     if (_palavraSalva == null || _palavraSalva!.isEmpty) {
       _mostrarSnack('Salve uma palavra-chave antes de ativar.');
       return;
@@ -844,22 +840,6 @@ class _PalavraChaveScreenState extends State<PalavraChaveScreen> {
     setState(() => _salvando = true);
     final prefs = await SharedPreferences.getInstance();
     if (value) {
-      // Copia o arquivo .ppn dos assets Flutter para o cache do dispositivo
-      String keywordPath = _palavraSalva!;
-      try {
-        final byteData = await rootBundle.load('assets/keyword_files/$_palavraSalva.ppn');
-        final tempDir = await getTemporaryDirectory();
-        final file = File('${tempDir.path}/$_palavraSalva.ppn');
-        await file.writeAsBytes(byteData.buffer.asUint8List());
-        keywordPath = file.path;
-        print('🟢 Arquivo .ppn copiado para: $keywordPath');
-      } catch (e) {
-        print('🔴 Erro ao copiar .ppn: $e');
-        _mostrarSnack('Arquivo de palavra-chave não encontrado.');
-        setState(() => _salvando = false);
-        return;
-      }
-
       // Busca contatos para SMS
       final uid = prefs.getInt('usuario_id') ?? 0;
       List<String> contatos = [];
@@ -872,17 +852,15 @@ class _PalavraChaveScreenState extends State<PalavraChaveScreen> {
         final data = jsonDecode(response.body);
         final lista = List<Map<String, dynamic>>.from(data['contatos'] ?? []);
         contatos = lista.map((c) => c['telefone'].toString()).toList();
-      } catch (e) {
-        print('Erro ao buscar contatos: $e');
-      }
-      print('🔵 Iniciando serviço com keyword: $keywordPath, contatos: $contatos');
+      } catch (_) {}
+
       final ok = await EmergencyServiceBridge.iniciar(
-        keyword: keywordPath,
+        keyword: _palavraSalva!,
         contatos: contatos,
       );
-      print('🟢 Serviço iniciado: $ok');
+      await prefs.setBool(_kAtivaKey, ok);
       setState(() { _ativa = ok; _salvando = false; });
-      _mostrarSnack(ok ? 'Safe Walk ativo! Ouvindo em segundo plano.' : 'Erro ao ativar. Verifique as configurações.');
+      _mostrarSnack(ok ? 'Safe Walk ativo! Ouvindo em segundo plano.' : 'Erro ao ativar.');
     } else {
       await EmergencyServiceBridge.parar();
       await prefs.setBool(_kAtivaKey, false);
@@ -1108,7 +1086,7 @@ class _PalavraChaveScreenState extends State<PalavraChaveScreen> {
                   SizedBox(width: 10),
                   Expanded(
                     child: Text(
-                      'O reconhecimento de voz utiliza o Porcupine da Picovoice e será ativado em segundo plano após configurar a chave de API.',
+                      'O reconhecimento de voz utiliza o Vosk e está ativo em segundo plano ao ligar o toggle acima.',
                       style: TextStyle(fontSize: 12, color: kPrimary, height: 1.5),
                     ),
                   ),

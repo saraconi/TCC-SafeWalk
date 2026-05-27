@@ -10,7 +10,7 @@ import 'package:http/http.dart' as http;
 //   MaterialPageRoute(builder: (_) => const RecuperarSenhaScreen())),
 // =============================================
 
-const String _kUrl = 'http://10.0.2.2/safewalk_api/auth.php';
+const String _kUrl = 'http://192.168.0.6/safewalk_api/auth.php';
 const Color _kBg      = Color(0xFFE8C8F0);
 const Color _kPrimary = Color(0xFF8B1A6B);
 const Color _kWhite   = Colors.white;

@@ -58,7 +58,7 @@ class _AlterarSenhaScreenState extends State<AlterarSenhaScreen> {
 
     try {
       final prefs = await SharedPreferences.getInstance();
-      final url   = prefs.getString('api_base_url') ?? 'http://10.0.2.2/safewalk_api/auth.php';
+      final url   = prefs.getString('api_base_url') ?? 'http://192.168.0.6/safewalk_api/auth.php';
 
       final response = await http.post(
         Uri.parse(url),

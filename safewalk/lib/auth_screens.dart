@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'recuperar_senha_screen.dart';
 
-const String kBaseUrl = 'http://10.0.2.2/safewalk_api/auth.php';
+const String kBaseUrl = 'http://192.168.0.6/safewalk_api/auth.php';
 
 const Color kBgColor      = Color(0xFFE8C8F0);
 const Color kPrimary     = Color(0xFF8B1A6B);
