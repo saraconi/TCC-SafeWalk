@@ -10,7 +10,7 @@ import 'perfil_screens.dart';
 // Dependências: http: ^1.2.1
 // =============================================
 
-const String kDadosUrl = 'http://192.168.0.6/safewalk_api/dados.php';
+const String kDadosUrl = 'http://10.0.2.2/safewalk_api/dados.php';
 
 // Cores
 const Color kBg      = Color(0xFFF5F0FF);
@@ -47,6 +47,7 @@ class _HomeShellState extends State<HomeShell> {
   @override
   void initState() {
     super.initState();
+    print('🔵 HomeShell iniciado com usuarioId: ${widget.usuarioId}');
     _telas = [
       HomeScreen(usuarioId: widget.usuarioId, usuarioEmail: widget.usuarioEmail, onNavigate: _navegarPara),
       AudiosScreen(usuarioId: widget.usuarioId),
@@ -119,8 +120,6 @@ class HomeScreen extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             const SizedBox(height: 12),
-
-            // Avatar
             Container(
               width: 64,
               height: 64,
@@ -138,15 +137,12 @@ class HomeScreen extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 16),
-
             const Text('Safe Walk',
                 style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Color(0xFF1A1A1A))),
             const SizedBox(height: 4),
             const Text('O seu segurança virtual',
                 style: TextStyle(fontSize: 13, color: kGrey)),
             const SizedBox(height: 40),
-
-            // Cards de atalho
             _CardAtalho(
               icone: Icons.mic,
               titulo: 'Áudios',
@@ -239,6 +235,7 @@ class AudiosScreen extends StatefulWidget {
 class _AudiosScreenState extends State<AudiosScreen> {
   List<Map<String, dynamic>> _audios = [];
   bool _loading = true;
+  String? _erro;
 
   @override
   void initState() {
@@ -247,16 +244,20 @@ class _AudiosScreenState extends State<AudiosScreen> {
   }
 
   Future<void> _carregarAudios() async {
-    setState(() => _loading = true);
+    setState(() { _loading = true; _erro = null; });
     try {
       final response = await http.post(
         Uri.parse(kDadosUrl),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'acao': 'listar_audios', 'usuario_id': widget.usuarioId}),
       ).timeout(const Duration(seconds: 10));
+      print('🟢 Áudios status: ${response.statusCode}, body: ${response.body}');
       final data = jsonDecode(response.body);
       setState(() => _audios = List<Map<String, dynamic>>.from(data['audios'] ?? []));
-    } catch (_) {} finally {
+    } catch (e) {
+      print('🔴 Erro ao carregar áudios: $e');
+      setState(() => _erro = 'Erro ao carregar áudios: $e');
+    } finally {
       setState(() => _loading = false);
     }
   }
@@ -283,7 +284,8 @@ class _AudiosScreenState extends State<AudiosScreen> {
                 GestureDetector(onTap: () => Navigator.maybePop(context),
                     child: const Icon(Icons.arrow_back_ios, size: 20)),
                 const Spacer(),
-                Icon(Icons.mic, color: kPrimary, size: 26),
+                GestureDetector(onTap: _carregarAudios,
+                    child: const Icon(Icons.refresh, color: kPrimary, size: 24)),
               ],
             ),
           ),
@@ -296,6 +298,11 @@ class _AudiosScreenState extends State<AudiosScreen> {
             child: Text('Confira e reproduza todos os seus áudios gravados.',
                 style: TextStyle(fontSize: 13, color: kGrey)),
           ),
+          if (_erro != null)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Text(_erro!, style: const TextStyle(color: Colors.red, fontSize: 12)),
+            ),
           Expanded(
             child: _loading
                 ? const Center(child: CircularProgressIndicator(color: kPrimary))
@@ -339,7 +346,6 @@ class _CardAudio extends StatelessWidget {
       ),
       child: Row(
         children: [
-          // Botão play
           Container(
             width: 40,
             height: 40,
@@ -347,7 +353,6 @@ class _CardAudio extends StatelessWidget {
             child: const Icon(Icons.play_arrow, color: kWhite, size: 22),
           ),
           const SizedBox(width: 12),
-          // Info + waveform
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -356,7 +361,6 @@ class _CardAudio extends StatelessWidget {
                 const SizedBox(height: 2),
                 Text(duracao, style: const TextStyle(fontSize: 12, color: kGrey)),
                 const SizedBox(height: 6),
-                // Waveform decorativa
                 Row(
                   children: List.generate(24, (i) {
                     final h = [8.0, 14.0, 20.0, 16.0, 10.0, 18.0, 22.0, 12.0][i % 8];
@@ -374,7 +378,6 @@ class _CardAudio extends StatelessWidget {
               ],
             ),
           ),
-          // Ações
           Column(
             children: [
               Icon(Icons.download_outlined, color: kGrey, size: 20),
@@ -405,24 +408,32 @@ class ContatosScreen extends StatefulWidget {
 class _ContatosScreenState extends State<ContatosScreen> {
   List<Map<String, dynamic>> _contatos = [];
   bool _loading = true;
+  String? _erro;
 
   @override
   void initState() {
     super.initState();
+    print('🔵 ContatosScreen iniciado com usuarioId: ${widget.usuarioId}');
     _carregarContatos();
   }
 
   Future<void> _carregarContatos() async {
-    setState(() => _loading = true);
+    setState(() { _loading = true; _erro = null; });
     try {
+      print('🔵 Buscando contatos para usuario_id: ${widget.usuarioId} em $kDadosUrl');
       final response = await http.post(
         Uri.parse(kDadosUrl),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'acao': 'listar_contatos', 'usuario_id': widget.usuarioId}),
       ).timeout(const Duration(seconds: 10));
+      print('🟢 Contatos status: ${response.statusCode}, body: ${response.body}');
       final data = jsonDecode(response.body);
       setState(() => _contatos = List<Map<String, dynamic>>.from(data['contatos'] ?? []));
-    } catch (_) {} finally {
+      print('🟢 Total de contatos carregados: ${_contatos.length}');
+    } catch (e) {
+      print('🔴 Erro ao carregar contatos: $e');
+      setState(() => _erro = 'Erro ao carregar contatos: $e');
+    } finally {
       setState(() => _loading = false);
     }
   }
@@ -465,16 +476,23 @@ class _ContatosScreenState extends State<ContatosScreen> {
               final tel  = telCtrl.text.trim();
               if (nome.isEmpty || tel.isEmpty) return;
               Navigator.pop(context);
-              if (contato == null) {
-                await http.post(Uri.parse(kDadosUrl),
-                    headers: {'Content-Type': 'application/json'},
-                    body: jsonEncode({'acao': 'adicionar_contato',
-                      'usuario_id': widget.usuarioId, 'nome': nome, 'telefone': tel}));
-              } else {
-                await http.post(Uri.parse(kDadosUrl),
-                    headers: {'Content-Type': 'application/json'},
-                    body: jsonEncode({'acao': 'editar_contato',
-                      'id': contato['id'], 'nome': nome, 'telefone': tel}));
+              try {
+                if (contato == null) {
+                  print('🔵 Adicionando contato: usuario_id=${widget.usuarioId}, nome=$nome, telefone=$tel');
+                  final resp = await http.post(Uri.parse(kDadosUrl),
+                      headers: {'Content-Type': 'application/json'},
+                      body: jsonEncode({'acao': 'adicionar_contato',
+                        'usuario_id': widget.usuarioId, 'nome': nome, 'telefone': tel}));
+                  print('🟢 Status: ${resp.statusCode}, Body: ${resp.body}');
+                } else {
+                  final resp = await http.post(Uri.parse(kDadosUrl),
+                      headers: {'Content-Type': 'application/json'},
+                      body: jsonEncode({'acao': 'editar_contato',
+                        'id': contato['id'], 'nome': nome, 'telefone': tel}));
+                  print('🟢 Status editar: ${resp.statusCode}, Body: ${resp.body}');
+                }
+              } catch (e) {
+                print('🔴 Erro ao salvar contato: $e');
               }
               _carregarContatos();
             },
@@ -506,6 +524,9 @@ class _ContatosScreenState extends State<ContatosScreen> {
                 GestureDetector(onTap: () => Navigator.maybePop(context),
                     child: const Icon(Icons.arrow_back_ios, size: 20)),
                 const Spacer(),
+                GestureDetector(onTap: _carregarContatos,
+                    child: const Icon(Icons.refresh, color: kPrimary, size: 24)),
+                const SizedBox(width: 16),
                 GestureDetector(
                   onTap: () => _abrirDialogContato(),
                   child: Icon(Icons.add, color: kPrimary, size: 28),
@@ -523,6 +544,11 @@ class _ContatosScreenState extends State<ContatosScreen> {
             child: Text('Gerencie seus contatos de confiança para emergências.',
                 style: TextStyle(fontSize: 13, color: kGrey)),
           ),
+          if (_erro != null)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Text(_erro!, style: const TextStyle(color: Colors.red, fontSize: 12)),
+            ),
           Expanded(
             child: _loading
                 ? const Center(child: CircularProgressIndicator(color: kPrimary))
@@ -535,6 +561,9 @@ class _ContatosScreenState extends State<ContatosScreen> {
                             const SizedBox(height: 12),
                             const Text('Nenhum contato cadastrado.',
                                 style: TextStyle(color: kGrey)),
+                            const SizedBox(height: 4),
+                            Text('(usuario_id: ${widget.usuarioId})',
+                                style: const TextStyle(color: kGrey, fontSize: 11)),
                           ],
                         ),
                       )
@@ -648,7 +677,6 @@ class PerfilScreen extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             const SizedBox(height: 16),
-            // Avatar grande
             Container(
               width: 88,
               height: 88,
@@ -672,8 +700,6 @@ class PerfilScreen extends StatelessWidget {
             Text('Usuário #$usuarioId',
                 style: const TextStyle(fontSize: 12, color: kGrey)),
             const SizedBox(height: 32),
-
-            // Opções de perfil
             _ItemPerfil(icone: Icons.lock_outline, titulo: 'Alterar senha', onTap: () {
               Navigator.push(context, MaterialPageRoute(
                 builder: (_) => AlterarSenhaScreen(usuarioId: usuarioId)));
@@ -687,8 +713,6 @@ class PerfilScreen extends StatelessWidget {
                 builder: (_) => const SobreScreen()));
             }),
             const SizedBox(height: 16),
-
-            // Logout
             SizedBox(
               width: double.infinity,
               height: 50,
@@ -840,7 +864,6 @@ class _PalavraChaveScreenState extends State<PalavraChaveScreen> {
     setState(() => _salvando = true);
     final prefs = await SharedPreferences.getInstance();
     if (value) {
-      // Busca contatos para SMS
       final uid = prefs.getInt('usuario_id') ?? 0;
       List<String> contatos = [];
       try {
@@ -890,6 +913,30 @@ class _PalavraChaveScreenState extends State<PalavraChaveScreen> {
     super.dispose();
   }
 
+  Future<void> _testarEmergencia() async {
+    _mostrarSnack('⚠️ Simulando emergência...');
+    final prefs = await SharedPreferences.getInstance();
+    final uid   = prefs.getInt('usuario_id') ?? 0;
+    List<String> contatos = [];
+    try {
+      final response = await http.post(
+        Uri.parse(kDadosUrl),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'acao': 'listar_contatos', 'usuario_id': uid}),
+      ).timeout(const Duration(seconds: 8));
+      final data = jsonDecode(response.body);
+      final lista = List<Map<String, dynamic>>.from(data['contatos'] ?? []);
+      contatos = lista.map((c) => c['telefone'].toString()).toList();
+    } catch (_) {}
+
+    await EmergencyServiceBridge.iniciar(
+      keyword: 'TESTE',
+      contatos: contatos,
+    );
+    await Future.delayed(const Duration(milliseconds: 500));
+    await EmergencyServiceBridge.simularDeteccao();
+  }
+
   @override
   Widget build(BuildContext context) {
     return SafeArea(
@@ -898,7 +945,6 @@ class _PalavraChaveScreenState extends State<PalavraChaveScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header
             Row(
               children: [
                 Container(
@@ -927,8 +973,6 @@ class _PalavraChaveScreenState extends State<PalavraChaveScreen> {
               style: TextStyle(fontSize: 13, color: kGrey, height: 1.5),
             ),
             const SizedBox(height: 24),
-
-            // Status card
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
@@ -977,8 +1021,6 @@ class _PalavraChaveScreenState extends State<PalavraChaveScreen> {
               ),
             ),
             const SizedBox(height: 24),
-
-            // Campo de palavra-chave
             const Text('Palavra ou frase de ativação',
                 style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
             const SizedBox(height: 8),
@@ -1004,8 +1046,6 @@ class _PalavraChaveScreenState extends State<PalavraChaveScreen> {
               ),
             ),
             const SizedBox(height: 8),
-
-            // Dica
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
@@ -1027,8 +1067,6 @@ class _PalavraChaveScreenState extends State<PalavraChaveScreen> {
               ),
             ),
             const SizedBox(height: 20),
-
-            // Botão salvar
             SizedBox(
               width: double.infinity,
               height: 50,
@@ -1048,8 +1086,6 @@ class _PalavraChaveScreenState extends State<PalavraChaveScreen> {
                     style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
               ),
             ),
-
-            // Botão remover (só aparece se tiver palavra salva)
             if (_palavraSalva != null) ...[
               const SizedBox(height: 12),
               SizedBox(
@@ -1068,10 +1104,7 @@ class _PalavraChaveScreenState extends State<PalavraChaveScreen> {
                 ),
               ),
             ],
-
             const SizedBox(height: 24),
-
-            // Aviso Picovoice
             Container(
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
@@ -1091,6 +1124,22 @@ class _PalavraChaveScreenState extends State<PalavraChaveScreen> {
                     ),
                   ),
                 ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              height: 50,
+              child: ElevatedButton.icon(
+                onPressed: _salvando ? null : _testarEmergencia,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.red.shade700,
+                  foregroundColor: kWhite,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                ),
+                icon: const Icon(Icons.warning_amber_rounded),
+                label: const Text('Simular emergência (teste)',
+                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
               ),
             ),
           ],

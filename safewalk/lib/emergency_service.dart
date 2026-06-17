@@ -1,15 +1,8 @@
 import 'package:flutter/services.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-
-// =============================================
-// Safe Walk - Ponte Flutter ↔ Android
-// Comunicação com EmergencyService via MethodChannel
-// =============================================
 
 class EmergencyServiceBridge {
   static const _channel = MethodChannel('safewalk/emergency');
 
-  // Inicia o Foreground Service com Porcupine
   static Future<bool> iniciar({
     required String keyword,
     required List<String> contatos,
@@ -31,7 +24,6 @@ class EmergencyServiceBridge {
     }
   }
 
-  // Para o Foreground Service completamente
   static Future<void> parar() async {
     try {
       await _channel.invokeMethod('pararServico');
@@ -40,7 +32,6 @@ class EmergencyServiceBridge {
     }
   }
 
-  // Para só a gravação (mantém Porcupine ouvindo)
   static Future<void> pararGravacao() async {
     try {
       await _channel.invokeMethod('pararGravacao');
@@ -49,7 +40,15 @@ class EmergencyServiceBridge {
     }
   }
 
-  // Verifica se o serviço está ativo
+  static Future<void> simularDeteccao() async {
+    try {
+      print('🔵 Simulando detecção de emergência');
+      await _channel.invokeMethod('simularDeteccao');
+    } on PlatformException catch (e) {
+      print('Erro ao simular: ${e.message}');
+    }
+  }
+
   static Future<bool> estaAtivo() async {
     try {
       final result = await _channel.invokeMethod<bool>('servicoAtivo');
@@ -59,8 +58,6 @@ class EmergencyServiceBridge {
     }
   }
 
-  // Salva o email do usuário nas SharedPreferences nativas
-  // (usado pelo EmergencyService para personalizar o SMS)
   static Future<void> salvarEmailUsuario(String email) async {
     try {
       await _channel.invokeMethod('salvarEmail', {'email': email});
@@ -68,6 +65,4 @@ class EmergencyServiceBridge {
       print('Erro ao salvar email: ${e.message}');
     }
   }
-
-
 }

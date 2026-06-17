@@ -2,9 +2,10 @@ import 'home_screens.dart';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 import 'recuperar_senha_screen.dart';
 
-const String kBaseUrl = 'http://192.168.0.6/safewalk_api/auth.php';
+const String kBaseUrl = 'http://10.0.2.2/safewalk_api/auth.php';
 
 const Color kBgColor      = Color(0xFFE8C8F0);
 const Color kPrimary     = Color(0xFF8B1A6B);
@@ -104,6 +105,7 @@ class _LoginScreenState extends State<LoginScreen> {
   String? _erro;
 
   Future<void> _login() async {
+    print("🔵 Tentando login em: $kBaseUrl");
     setState(() { _loading = true; _erro = null; });
 
     try {
@@ -121,11 +123,14 @@ class _LoginScreenState extends State<LoginScreen> {
 
       if (response.statusCode == 200) {
         if (!mounted) return;
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setInt('usuario_id', int.parse(data['usuario']['id'].toString()));
+        await prefs.setString('usuario_email', data['usuario']['email']);
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
             builder: (_) => HomeShell(
-              usuarioId: data['usuario']['id'],
+              usuarioId: int.parse(data['usuario']['id'].toString()),
               usuarioEmail: data['usuario']['email'],
             ),
           ),
