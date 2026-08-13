@@ -10,7 +10,7 @@ import 'perfil_screens.dart';
 // Dependências: http: ^1.2.1
 // =============================================
 
-const String kDadosUrl = 'http://10.0.2.2/safewalk_api/dados.php';
+const String kDadosUrl = 'http://192.168.137.61/safewalk_api/dados.php';
 
 // Cores
 const Color kBg      = Color(0xFFF5F0FF);
@@ -50,8 +50,6 @@ class _HomeShellState extends State<HomeShell> {
     print('🔵 HomeShell iniciado com usuarioId: ${widget.usuarioId}');
     _telas = [
       HomeScreen(usuarioId: widget.usuarioId, usuarioEmail: widget.usuarioEmail, onNavigate: _navegarPara),
-      AudiosScreen(usuarioId: widget.usuarioId),
-      const PalavraChaveScreen(),
       ContatosScreen(usuarioId: widget.usuarioId),
       PerfilScreen(usuarioId: widget.usuarioId, usuarioEmail: widget.usuarioEmail),
     ];
@@ -83,8 +81,6 @@ class _HomeShellState extends State<HomeShell> {
         unselectedLabelStyle: const TextStyle(fontSize: 11),
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.home_outlined), activeIcon: Icon(Icons.home), label: 'Início'),
-          BottomNavigationBarItem(icon: Icon(Icons.mic_none), activeIcon: Icon(Icons.mic), label: 'Áudios'),
-          BottomNavigationBarItem(icon: Icon(Icons.record_voice_over_outlined), activeIcon: Icon(Icons.record_voice_over), label: 'Palavra-chave'),
           BottomNavigationBarItem(icon: Icon(Icons.people_outline), activeIcon: Icon(Icons.people), label: 'Contatos'),
           BottomNavigationBarItem(icon: Icon(Icons.person_outline), activeIcon: Icon(Icons.person), label: 'Perfil'),
         ],
@@ -151,17 +147,10 @@ class HomeScreen extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             _CardAtalho(
-              icone: Icons.record_voice_over,
-              titulo: 'Palavra-chave',
-              subtitulo: 'Configure sua palavra de ativação',
-              onTap: () => onNavigate(2),
-            ),
-            const SizedBox(height: 16),
-            _CardAtalho(
               icone: Icons.people,
               titulo: 'Contatos de Emergência',
               subtitulo: 'Gerencie seus contatos de confiança',
-              onTap: () => onNavigate(3),
+              onTap: () => onNavigate(1),
             ),
           ],
         ),

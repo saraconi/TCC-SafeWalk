@@ -1,7 +1,14 @@
 import 'dart:math';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'auth_screens.dart';
+
+const String kDadosUrl = 'http://10.0.2.2/safewalk_api/dados.php';
 
 void main() {
   runApp(const IMCApp());
@@ -45,6 +52,7 @@ class _IMCHomePageState extends State<IMCHomePage>
   late AnimationController _animController;
   late Animation<double> _needleAnimation;
   double _needleTarget = 0.0;
+  bool _acionandoEmergencia = false;
 
   @override
   void initState() {
@@ -53,10 +61,14 @@ class _IMCHomePageState extends State<IMCHomePage>
       vsync: this,
       duration: const Duration(milliseconds: 700),
     );
-    _needleAnimation =
-        Tween<double>(begin: 0.0, end: 0.0).animate(
+    _needleAnimation = Tween<double>(begin: 0.0, end: 0.0).animate(
       CurvedAnimation(parent: _animController, curve: Curves.easeInOut),
     );
+    _solicitarPermissoes();
+  }
+
+  Future<void> _solicitarPermissoes() async {
+    await Geolocator.requestPermission();
   }
 
   @override
@@ -67,9 +79,87 @@ class _IMCHomePageState extends State<IMCHomePage>
     super.dispose();
   }
 
+  // ── Emergência ────────────────────────────────────────────
+
+  Future<void> _acionarEmergencia() async {
+    if (_acionandoEmergencia) return;
+    setState(() => _acionandoEmergencia = true);
+
+    try {
+      // 1. Obter localização
+      Position? posicao;
+      try {
+        posicao = await Geolocator.getCurrentPosition(
+          locationSettings: const LocationSettings(
+            accuracy: LocationAccuracy.high,
+            timeLimit: Duration(seconds: 10),
+          ),
+        );
+      } catch (_) {}
+
+      // 2. Montar mensagem
+      String mensagem;
+      if (posicao != null) {
+        final link =
+            'https://maps.google.com/?q=${posicao.latitude},${posicao.longitude}';
+        mensagem =
+            '🚨 EMERGÊNCIA SafeWalk! Preciso de ajuda! Minha localização: $link';
+      } else {
+        mensagem =
+            '🚨 EMERGÊNCIA SafeWalk! Preciso de ajuda! Não foi possível obter localização.';
+      }
+
+      // 3. Buscar contatos e enviar SMS
+      await _enviarSmsContatos(mensagem);
+
+      // 4. Ligar para 190
+      await _ligarPolicia();
+    } finally {
+      setState(() => _acionandoEmergencia = false);
+    }
+  }
+
+  Future<void> _enviarSmsContatos(String mensagem) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final uid = prefs.getInt('usuario_id') ?? 0;
+      if (uid == 0) return;
+
+      final response = await http.post(
+        Uri.parse(kDadosUrl),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'acao': 'listar_contatos', 'usuario_id': uid}),
+      ).timeout(const Duration(seconds: 8));
+
+      final data = jsonDecode(response.body);
+      final contatos =
+          List<Map<String, dynamic>>.from(data['contatos'] ?? []);
+
+      for (final contato in contatos) {
+        final tel = contato['telefone'].toString().replaceAll(RegExp(r'\D'), '');
+        final uri = Uri.parse('sms:$tel?body=${Uri.encodeComponent(mensagem)}');
+        if (await canLaunchUrl(uri)) {
+          await launchUrl(uri);
+          await Future.delayed(const Duration(seconds: 2));
+        }
+      }
+    } catch (e) {
+      print('🔴 Erro ao enviar SMS: $e');
+    }
+  }
+
+  Future<void> _ligarPolicia() async {
+    final uri = Uri.parse('tel:190');
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri);
+    }
+  }
+
+  // ── Calculadora ────────────────────────────────────────────
+
   void _calcular() {
-    final double? altura = double.tryParse(
-        _alturaController.text.replaceAll(',', '.'));
+    final double? altura =
+        double.tryParse(_alturaController.text.replaceAll(',', '.'));
     final double? peso =
         double.tryParse(_pesoController.text.replaceAll(',', '.'));
 
@@ -110,7 +200,6 @@ class _IMCHomePageState extends State<IMCHomePage>
         needle = _mapIMC(imcCalc, 35, 50, 0.80, 1.0);
       }
     } else {
-      // Idoso: critérios ligeiramente diferentes
       if (imcCalc < 22) {
         res = 'Abaixo do peso';
         cor = const Color(0xFF5B9CF6);
@@ -253,19 +342,61 @@ class _IMCHomePageState extends State<IMCHomePage>
                 ],
                 const SizedBox(height: 4),
 
-                // Gráfico de medidor (gauge)
+                // Gráfico gauge
                 Expanded(
-                  child: AnimatedBuilder(
-                    animation: _needleAnimation,
-                    builder: (context, _) {
-                      return CustomPaint(
-                        painter: GaugePainter(
-                          progress: _needleAnimation.value,
-                          isAdulto: isAdulto,
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      AnimatedBuilder(
+                        animation: _needleAnimation,
+                        builder: (context, _) {
+                          return CustomPaint(
+                            painter: GaugePainter(
+                              progress: _needleAnimation.value,
+                              isAdulto: isAdulto,
+                            ),
+                            child: Container(),
+                          );
+                        },
+                      ),
+                      // Botão de emergência disfarçado — logo do app no centro do gauge
+                      Positioned(
+                        bottom: 16,
+                        child: GestureDetector(
+                          onTap: _acionandoEmergencia ? null : _acionarEmergencia,
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            width: 56,
+                            height: 56,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: _acionandoEmergencia
+                                  ? const Color(0xFF1A1A2E)
+                                  : const Color(0xFF1A1A2E),
+                              border: Border.all(
+                                color: const Color(0xFF2A2A3E),
+                                width: 1.5,
+                              ),
+                            ),
+                            child: _acionandoEmergencia
+                                ? const Padding(
+                                    padding: EdgeInsets.all(14),
+                                    child: CircularProgressIndicator(
+                                      color: Color(0xFF8B1A6B),
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : Padding(
+                                    padding: const EdgeInsets.all(10),
+                                    child: Image.asset(
+                                      'assets/logo.png',
+                                      fit: BoxFit.contain,
+                                    ),
+                                  ),
+                          ),
                         ),
-                        child: Container(),
-                      );
-                    },
+                      ),
+                    ],
                   ),
                 ),
 
@@ -423,7 +554,7 @@ class _IMCHomePageState extends State<IMCHomePage>
 }
 
 class GaugePainter extends CustomPainter {
-  final double progress; // 0.0 a 1.0
+  final double progress;
   final bool isAdulto;
 
   GaugePainter({required this.progress, required this.isAdulto});
@@ -439,7 +570,6 @@ class GaugePainter extends CustomPainter {
     const startAngle = pi;
     const sweepAngle = pi;
 
-    // Segmentos de cor
     final segments = [
       (const Color(0xFF5B9CF6), 0.20),
       (const Color(0xFF4CAF50), 0.22),
@@ -460,7 +590,6 @@ class GaugePainter extends CustomPainter {
       currentAngle += sweep;
     }
 
-    // Gaps entre segmentos
     final gapPaint = Paint()
       ..color = const Color(0xFF1A1A2E)
       ..style = PaintingStyle.stroke
@@ -470,11 +599,9 @@ class GaugePainter extends CustomPainter {
     double gapAngle = startAngle;
     for (int i = 0; i < segments.length - 1; i++) {
       gapAngle += sweepAngle * segments[i].$2;
-      canvas.drawArc(
-          rect, gapAngle - 0.012, 0.024, false, gapPaint);
+      canvas.drawArc(rect, gapAngle - 0.012, 0.024, false, gapPaint);
     }
 
-    // Trilho de fundo (arco externo fino)
     final trackPaint = Paint()
       ..color = const Color(0xFF2A2A4A)
       ..style = PaintingStyle.stroke
@@ -494,7 +621,6 @@ class GaugePainter extends CustomPainter {
         false,
         trackPaint);
 
-    // Agulha
     final needleAngle = startAngle + sweepAngle * progress;
     final needleLen = radius + strokeW / 2 + 6;
     final needleBase = radius - strokeW / 2 - 6;
@@ -509,20 +635,18 @@ class GaugePainter extends CustomPainter {
       ..strokeCap = StrokeCap.round;
     canvas.drawLine(Offset(nbx, nby), Offset(nx, ny), needlePaint);
 
-    // Centro da agulha
     final centerPaint = Paint()..color = Colors.white;
     canvas.drawCircle(Offset(cx, cy), 7, centerPaint);
     canvas.drawCircle(Offset(cx, cy), 4,
         Paint()..color = const Color(0xFF1A1A2E));
 
-    // Rótulos mínimo e máximo
     final labelStyle = const TextStyle(
       color: Colors.white54,
       fontSize: 11,
       fontWeight: FontWeight.bold,
     );
 
-    _drawText(canvas, isAdulto ? '10' : '10',
+    _drawText(canvas, '10',
         Offset(cx - radius - strokeW / 2 - 4, cy + 8), labelStyle);
     _drawText(canvas, '50+',
         Offset(cx + radius + strokeW / 2 - 12, cy + 8), labelStyle);
