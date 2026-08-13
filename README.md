@@ -8,7 +8,7 @@
 Etec Professor Camargo Aranha · São Paulo, SP · 2026
 
 [![Flutter](https://img.shields.io/badge/Flutter-Framework-02569B?style=flat&logo=flutter)](https://flutter.dev)
-[![PHP](https://img.shields.io/badge/API-PHP-777BB4?style=flat&logo=php&logoColor=white)](https://php.net)
+[![Kptlin](https://kotlinlang.org/docs/home.html)](https://icons8.com/icon/ZoxjA0jZDdFZ/kotlin)
 [![MySQL](https://img.shields.io/badge/Database-MySQL-4479A1?style=flat&logo=mysql&logoColor=white)](https://mysql.com)
 [![XAMPP](https://img.shields.io/badge/Server-XAMPP-FB7A24?style=flat&logo=apachenetbeanside&logoColor=white)](https://apachefriends.org)
 
@@ -22,7 +22,7 @@ O **SafeWalk** é um aplicativo mobile de segurança pessoal desenvolvido como T
 
 O projeto nasceu da necessidade de proteger **grupos vulneráveis** — mulheres, idosos e a comunidade LGBT+ — da violência cotidiana. Com **88,9% da população brasileira acima de 10 anos possuindo celular** (IBGE, 2024), o smartphone se torna a ferramenta mais acessível e eficaz para oferecer segurança em tempo real.
 
-O SafeWalk transforma o celular em um **dispositivo de segurança ativa**: ao detectar uma palavra-chave em segundo plano, o aplicativo automaticamente envia a localização do usuário para contatos de emergência, inicia gravação de áudio e aciona a polícia — tudo sem qualquer interação manual, e de forma discreta.
+O SafeWalk transforma o celular em um **dispositivo de segurança ativa**: ao pressionar um botão de emergencia, o aplicativo automaticamente envia a localização do usuário para contatos de emergência, inicia gravação de áudio e aciona a polícia — tudo sem qualquer interação manual, e de forma discreta.
 
 > 💡 O app possui um **modo disfarce** como Calculadora de IMC para não levantar suspeitas de possíveis agressores que monitorem o aparelho da vítima.
 
@@ -46,15 +46,8 @@ O SafeWalk transforma o celular em um **dispositivo de segurança ativa**: ao de
 - ✅ Tela de boas-vindas
 - ✅ Cadastro de usuário com validação
 - ✅ Login com verificação de senha (bcrypt)
-- ✅ API REST em PHP com PDO
-
-### Planejadas
-- 🔜 Detecção de palavra-chave em segundo plano (wake word via Picovoice Porcupine)
-- 🔜 Envio automático de localização para contatos de emergência
-- 🔜 Gravação de áudio como prova, salva na nuvem e em servidor local
-- 🔜 Ligação automática para a polícia com localização e situação de perigo
-- 🔜 Autenticação por reconhecimento facial para acesso às gravações
-- 🔜 Integração com Python no back-end para requisições e envio de alertas
+- ✅ Kotlin para as validações
+- ✅ Disparo do botão de emergencia
 
 ---
 
