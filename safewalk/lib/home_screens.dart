@@ -10,7 +10,7 @@ import 'perfil_screens.dart';
 // Dependências: http: ^1.2.1
 // =============================================
 
-const String kDadosUrl = 'http://192.168.137.61/safewalk_api/dados.php';
+const String kDadosUrl = 'http://192.168.0.18/safewalk_api/dados.php';
 
 // Cores
 const Color kBg      = Color(0xFFF5F0FF);
@@ -42,14 +42,11 @@ class _HomeShellState extends State<HomeShell> {
 
   late final List<Widget> _telas;
 
-  void _navegarPara(int index) => setState(() => _currentIndex = index);
-
   @override
   void initState() {
     super.initState();
     print('🔵 HomeShell iniciado com usuarioId: ${widget.usuarioId}');
     _telas = [
-      HomeScreen(usuarioId: widget.usuarioId, usuarioEmail: widget.usuarioEmail, onNavigate: _navegarPara),
       ContatosScreen(usuarioId: widget.usuarioId),
       PerfilScreen(usuarioId: widget.usuarioId, usuarioEmail: widget.usuarioEmail),
     ];
@@ -59,11 +56,7 @@ class _HomeShellState extends State<HomeShell> {
   Widget build(BuildContext context) {
     return PopScope(
       canPop: false,
-      onPopInvokedWithResult: (didPop, result) {
-        if (_currentIndex != 0) {
-          setState(() => _currentIndex = 0);
-        }
-      },
+      onPopInvokedWithResult: (didPop, result) {},
       child: Scaffold(
       backgroundColor: kBg,
       body: IndexedStack(
@@ -80,7 +73,6 @@ class _HomeShellState extends State<HomeShell> {
         selectedLabelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 11),
         unselectedLabelStyle: const TextStyle(fontSize: 11),
         items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home_outlined), activeIcon: Icon(Icons.home), label: 'Início'),
           BottomNavigationBarItem(icon: Icon(Icons.people_outline), activeIcon: Icon(Icons.people), label: 'Contatos'),
           BottomNavigationBarItem(icon: Icon(Icons.person_outline), activeIcon: Icon(Icons.person), label: 'Perfil'),
         ],

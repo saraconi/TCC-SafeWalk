@@ -8,7 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'auth_screens.dart';
 
-const String kDadosUrl = 'http://10.0.2.2/safewalk_api/dados.php';
+const String kDadosUrl = 'http://192.168.0.18/safewalk_api/dados.php';
 
 void main() {
   runApp(const IMCApp());
@@ -151,7 +151,7 @@ class _IMCHomePageState extends State<IMCHomePage>
   Future<void> _ligarPolicia() async {
     final uri = Uri.parse('tel:190');
     if (await canLaunchUrl(uri)) {
-      await launchUrl(uri);
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
     }
   }
 
@@ -257,14 +257,52 @@ class _IMCHomePageState extends State<IMCHomePage>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                // Título
-                const Text(
-                  'Calculadora IMC',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                  ),
+                // Header com logo (botão de emergência) e título
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    // Botão de emergência disfarçado como logo do app
+                    GestureDetector(
+                      onTap: _acionandoEmergencia ? null : _acionarEmergencia,
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: const Color(0xFF16213E),
+                          border: Border.all(
+                            color: const Color(0xFF2A2A3E),
+                            width: 1.5,
+                          ),
+                        ),
+                        child: _acionandoEmergencia
+                            ? const Padding(
+                                padding: EdgeInsets.all(10),
+                                child: CircularProgressIndicator(
+                                  color: Color(0xFF8B1A6B),
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : Padding(
+                                padding: const EdgeInsets.all(8),
+                                child: Image.asset(
+                                  'assets/logo.png',
+                                  fit: BoxFit.contain,
+                                ),
+                              ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    const Text(
+                      'Calculadora IMC',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 4),
                 const Text(
@@ -344,59 +382,17 @@ class _IMCHomePageState extends State<IMCHomePage>
 
                 // Gráfico gauge
                 Expanded(
-                  child: Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      AnimatedBuilder(
-                        animation: _needleAnimation,
-                        builder: (context, _) {
-                          return CustomPaint(
-                            painter: GaugePainter(
-                              progress: _needleAnimation.value,
-                              isAdulto: isAdulto,
-                            ),
-                            child: Container(),
-                          );
-                        },
-                      ),
-                      // Botão de emergência disfarçado — logo do app no centro do gauge
-                      Positioned(
-                        bottom: 16,
-                        child: GestureDetector(
-                          onTap: _acionandoEmergencia ? null : _acionarEmergencia,
-                          child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 200),
-                            width: 56,
-                            height: 56,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: _acionandoEmergencia
-                                  ? const Color(0xFF1A1A2E)
-                                  : const Color(0xFF1A1A2E),
-                              border: Border.all(
-                                color: const Color(0xFF2A2A3E),
-                                width: 1.5,
-                              ),
-                            ),
-                            child: _acionandoEmergencia
-                                ? const Padding(
-                                    padding: EdgeInsets.all(14),
-                                    child: CircularProgressIndicator(
-                                      color: Color(0xFF8B1A6B),
-                                      strokeWidth: 2,
-                                    ),
-                                  )
-                                : Padding(
-                                    padding: const EdgeInsets.all(10),
-                                    child: Image.asset(
-                                      'assets/logo.png',
-                                      fit: BoxFit.contain,
-                                    ),
-                                  ),
-                          ),
+                  child: AnimatedBuilder(
+                    animation: _needleAnimation,
+                    builder: (context, _) {
+                      return CustomPaint(
+                        painter: GaugePainter(
+                          progress: _needleAnimation.value,
+                          isAdulto: isAdulto,
                         ),
-                      ),
-                    ],
+                        child: Container(),
+                      );
+                    },
                   ),
                 ),
 

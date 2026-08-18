@@ -5,7 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'recuperar_senha_screen.dart';
 
-const String kBaseUrl = 'http://192.168.137.61/safewalk_api/auth.php';
+const String kBaseUrl = 'http://192.168.0.18/safewalk_api/auth.php';
 
 const Color kBgColor      = Color(0xFFE8C8F0);
 const Color kPrimary     = Color(0xFF8B1A6B);
