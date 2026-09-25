@@ -8,7 +8,7 @@
 Etec Professor Camargo Aranha · São Paulo, SP · 2026
 
 [![Flutter](https://img.shields.io/badge/Flutter-Framework-02569B?style=flat&logo=flutter)](https://flutter.dev)
-[![Kptlin](https://kotlinlang.org/docs/home.html)](https://icons8.com/icon/ZoxjA0jZDdFZ/kotlin)
+[![Kotlin](https://img.shields.io/badge/Language-Kotlin-7F52FF?style=flat&logo=kotlin&logoColor=white)](https://kotlinlang.org)
 [![MySQL](https://img.shields.io/badge/Database-MySQL-4479A1?style=flat&logo=mysql&logoColor=white)](https://mysql.com)
 [![XAMPP](https://img.shields.io/badge/Server-XAMPP-FB7A24?style=flat&logo=apachenetbeanside&logoColor=white)](https://apachefriends.org)
 
@@ -18,11 +18,11 @@ Etec Professor Camargo Aranha · São Paulo, SP · 2026
 
 ## 📌 Sobre o Projeto
 
-O **SafeWalk** é um aplicativo mobile de segurança pessoal desenvolvido como Trabalho de Conclusão de Curso do curso Técnico em Desenvolvimento de Sistemas da **Etec Professor Camargo Aranha**.
+O **SafeWalk** é um aplicativo mobile de segurança pessoal desenvolvido como Trabalho de Conclusão de Curso do curso Técnico em Desenvolvimento de Sistemas da **Etec Professor Camargo Aranha**, orientado pelo Prof. Célide Tasso da Silva.
 
 O projeto nasceu da necessidade de proteger **grupos vulneráveis** — mulheres, idosos e a comunidade LGBT+ — da violência cotidiana. Com **88,9% da população brasileira acima de 10 anos possuindo celular** (IBGE, 2024), o smartphone se torna a ferramenta mais acessível e eficaz para oferecer segurança em tempo real.
 
-O SafeWalk transforma o celular em um **dispositivo de segurança ativa**: ao pressionar um botão de emergencia, o aplicativo automaticamente envia a localização do usuário para contatos de emergência, inicia gravação de áudio e aciona a polícia — tudo sem qualquer interação manual, e de forma discreta.
+O SafeWalk transforma o celular em um **dispositivo de segurança ativa**: ao pressionar o botão de emergência (de forma visível ou por combinações discretas dos botões físicos do aparelho), o aplicativo captura automaticamente as coordenadas de GPS do usuário, gera um link dinâmico do Google Maps e dispara mensagens SMS com essa localização para os contatos de confiança previamente cadastrados — tudo sem qualquer interação manual adicional, de forma silenciosa e em fração de segundos.
 
 > 💡 O app possui um **modo disfarce** como Calculadora de IMC para não levantar suspeitas de possíveis agressores que monitorem o aparelho da vítima.
 
@@ -32,9 +32,11 @@ O SafeWalk transforma o celular em um **dispositivo de segurança ativa**: ao pr
 
 | Nome | GitHub |
 |---|---|
-| João Guilherme | [@joaopresser](https://github.com/joaopresser) |
-| Sara Coni | [@saraconi](https://github.com/saraconi) |
-| Thiago Ochoa | [@yungtl](https://github.com/yungtl) |
+| João Guilherme David Presser | [@joaopresser](https://github.com/joaopresser) |
+| Sara Souza Coni Lima | [@saraconi](https://github.com/saraconi) |
+| Thiago Nilmar Ochoa Lezcano | [@yungtl](https://github.com/yungtl) |
+
+**Orientador:** Prof. Célide Tasso da Silva
 
 ---
 
@@ -48,6 +50,21 @@ O SafeWalk transforma o celular em um **dispositivo de segurança ativa**: ao pr
 - ✅ Login com verificação de senha (bcrypt)
 - ✅ Kotlin para as validações
 - ✅ Disparo do botão de emergencia
+
+### Requisitos do sistema (documentação técnica)
+
+**Funcionais**
+- Botão de emergência de fácil acesso e acionamento discreto, integrável aos botões físicos do dispositivo
+- Disparo imediato do protocolo de alerta ao ser acionado
+- Captura das coordenadas de GPS (latitude e longitude) do dispositivo
+- Geração de link do Google Maps com a localização e envio automático via SMS aos contatos de emergência cadastrados
+- Interface de camuflagem operacional simulando uma Calculadora de IMC
+
+**Não funcionais**
+- Baixíssimo tempo de resposta no acionamento das rotinas de emergência (primeiro e segundo plano)
+- Persistência de dados em MySQL, garantindo integridade das informações
+- Precisão de geolocalização com margem de erro média entre 5 e 10 metros
+- Compatibilidade multiplataforma nativa via Flutter
 
 ---
 
@@ -226,7 +243,7 @@ TCC-SafeWalk/
 - **Nunca suba o `auth.php` com sua senha real para o Git**
 - O arquivo `auth.php` já está no `.gitignore` por padrão
 - As senhas são armazenadas com hash **bcrypt** (nunca em texto puro)
-- O projeto foi desenvolvido em conformidade com a **LGPD (Lei nº 13.709/2018)** — dados de localização e áudios serão tratados com sigilo
+- O projeto foi desenvolvido em conformidade com a **LGPD (Lei nº 13.709/2018)** — dados de localização serão tratados com sigilo
 - Todos os usuários assinarão um **Termo de Responsabilidade e Ciência Jurídica** no cadastro, vinculando sua identidade a cada alerta emitido
 
 ---
@@ -235,8 +252,9 @@ TCC-SafeWalk/
 
 O SafeWalk foi desenvolvido para complementar o aparato legal brasileiro de proteção a grupos vulneráveis:
 
-- **Lei Maria da Penha** (Lei nº 11.340) — proteção contra violência doméstica e familiar
-- **Estatuto do Idoso** (Lei nº 10.741) — proteção aos direitos da pessoa idosa
+- **Lei Maria da Penha** (Lei nº 11.340/2006) — prevenção e punição da violência doméstica e familiar contra a mulher
+- **Estatuto do Idoso** (Lei nº 10.741/2003) — proteção aos direitos e à integridade da pessoa idosa
+- **Lei de Crimes Raciais** (Lei nº 7.716/1989) — que, por decisão do STF (ADO 26), passou a criminalizar a homofobia e a transfobia
 - **Lei do Feminicídio** (Lei nº 13.104/2015) — qualificação do homicídio contra mulher
 - **LGPD** (Lei nº 13.709/2018) — proteção de dados pessoais dos usuários
 
@@ -250,6 +268,8 @@ Enquanto essas leis atuam após o fato, o SafeWalk atua **no momento da agressã
 - BRASIL. *Lei nº 13.709, de 14 de agosto de 2018.* Lei Geral de Proteção de Dados Pessoais (LGPD).
 - BRASIL. *Lei nº 13.104, de 9 de março de 2015.* Lei do Feminicídio.
 - FÓRUM BRASILEIRO DE SEGURANÇA PÚBLICA. *Visível e Invisível: a Vitimização de Mulheres no Brasil.* 5. ed. São Paulo: FBSP, 2024.
+- FÓRUM BRASILEIRO DE SEGURANÇA PÚBLICA. *Anuário Brasileiro de Segurança Pública 2025.* São Paulo: FBSP, 2025.
+- SENADO FEDERAL. *Pesquisa Nacional de Violência contra a Mulher.* Brasília, DF: DataSenado, 2025.
 
 ---
 
